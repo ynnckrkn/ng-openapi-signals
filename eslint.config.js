@@ -1,8 +1,9 @@
+import { defineConfig } from 'eslint/config';
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default defineConfig([
   {
     ignores: [
       'dist/**',
@@ -11,8 +12,11 @@ export default tseslint.config(
       'examples/generated/**'
     ]
   },
+
   js.configs.recommended,
+
   ...tseslint.configs.recommended,
+
   {
     files: ['src/**/*.ts', 'tests/**/*.ts'],
     languageOptions: {
@@ -24,20 +28,25 @@ export default tseslint.config(
     },
     rules: {
       'no-console': 'off',
+
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/consistent-type-imports': [
-        'warn',
-        {
-          prefer: 'type-imports'
-        }
-      ],
+
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {
           argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_'
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_'
+        }
+      ],
+
+      '@typescript-eslint/consistent-type-imports': [
+        'warn',
+        {
+          prefer: 'type-imports',
+          fixStyle: 'inline-type-imports'
         }
       ]
     }
   }
-);
+]);
