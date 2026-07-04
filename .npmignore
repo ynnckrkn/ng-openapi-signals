@@ -8,3 +8,5 @@ examples/generated
 AGENTS.md
 .prettierrc
 eslint.config.js
+tests
+tsconfig.test.json
