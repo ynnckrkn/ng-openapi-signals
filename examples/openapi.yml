@@ -1,0 +1,390 @@
+openapi: 3.0.3
+info:
+  title: Users API
+  version: 1.0.0
+  description: Example API showing how to use example and examples in OpenAPI.
+
+servers:
+  - url: https://api.example.com
+    description: Production server
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /users:
+    get:
+      operationId: searchUsers
+      tags:
+        - Users
+      summary: Search users
+      description: Returns a list of users filtered by status, search query and limit.
+
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term for user name or email.
+          schema:
+            type: string
+            example: john
+          example: john
+
+        - name: status
+          in: query
+          required: false
+          description: Filter users by account status.
+          schema:
+            type: string
+            enum:
+              - active
+              - invited
+              - disabled
+            example: active
+
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of users to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          examples:
+            small:
+              summary: Small result set
+              value: 10
+            defaultLimit:
+              summary: Default result set size
+              value: 20
+            max:
+              summary: Maximum allowed result set size
+              value: 100
+
+      responses:
+        "200":
+          description: List of users.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+              examples:
+                twoUsers:
+                  summary: Two users
+                  value:
+                    data:
+                      - id: usr_123
+                        name: John Doe
+                        email: john@example.com
+                        status: active
+                        role: admin
+                        createdAt: "2026-07-04T10:15:00Z"
+                      - id: usr_456
+                        name: Jane Smith
+                        email: jane@example.com
+                        status: invited
+                        role: user
+                        createdAt: "2026-07-04T11:00:00Z"
+                    pagination:
+                      total: 2
+                      limit: 20
+                      offset: 0
+
+                empty:
+                  summary: Empty result
+                  value:
+                    data: []
+                    pagination:
+                      total: 0
+                      limit: 20
+                      offset: 0
+
+    post:
+      operationId: createUser
+      tags:
+        - Users
+      summary: Create a new user
+
+      requestBody:
+        required: true
+        description: User data to create.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+            examples:
+              adminUser:
+                summary: Create an admin user
+                value:
+                  name: John Doe
+                  email: john@example.com
+                  role: admin
+
+              normalUser:
+                summary: Create a normal user
+                value:
+                  name: Jane Smith
+                  email: jane@example.com
+                  role: user
+
+      responses:
+        "201":
+          description: User created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              example:
+                id: usr_123
+                name: John Doe
+                email: john@example.com
+                status: active
+                role: admin
+                createdAt: "2026-07-04T10:15:00Z"
+
+        "400":
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingEmail:
+                  summary: Missing email
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Email is required.
+                    details:
+                      field: email
+                      reason: required
+
+                invalidRole:
+                  summary: Invalid role
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Role must be either admin or user.
+                    details:
+                      field: role
+                      reason: invalid_enum_value
+
+  /users/{id}:
+    get:
+      operationId: getUserById
+      tags:
+        - Users
+      summary: Get a user by ID
+
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique user ID.
+          schema:
+            type: string
+          example: usr_123
+
+      responses:
+        "200":
+          description: User found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              examples:
+                activeAdmin:
+                  $ref: "#/components/examples/ActiveAdminUser"
+                invitedUser:
+                  $ref: "#/components/examples/InvitedUser"
+
+        "404":
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: USER_NOT_FOUND
+                message: User with ID usr_999 was not found.
+                details:
+                  id: usr_999
+
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - status
+        - role
+        - createdAt
+      description: A user account.
+      example:
+        id: usr_123
+        name: John Doe
+        email: john@example.com
+        status: active
+        role: admin
+        createdAt: "2026-07-04T10:15:00Z"
+      properties:
+        id:
+          type: string
+          description: Unique user ID.
+          example: usr_123
+
+        name:
+          type: string
+          description: Full name of the user.
+          example: John Doe
+
+        email:
+          type: string
+          format: email
+          description: Email address of the user.
+          example: john@example.com
+
+        status:
+          type: string
+          description: Current account status.
+          enum:
+            - active
+            - invited
+            - disabled
+          example: active
+
+        role:
+          type: string
+          description: User role.
+          enum:
+            - admin
+            - user
+          example: admin
+
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp.
+          example: "2026-07-04T10:15:00Z"
+
+    CreateUserRequest:
+      type: object
+      required:
+        - name
+        - email
+        - role
+      description: Request body for creating a user.
+      example:
+        name: John Doe
+        email: john@example.com
+        role: admin
+      properties:
+        name:
+          type: string
+          example: John Doe
+
+        email:
+          type: string
+          format: email
+          example: john@example.com
+
+        role:
+          type: string
+          enum:
+            - admin
+            - user
+          example: user
+
+    UserListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+      properties:
+        data:
+          type: array
+          description: List of users.
+          example:
+            - id: usr_123
+              name: John Doe
+              email: john@example.com
+              status: active
+              role: admin
+              createdAt: "2026-07-04T10:15:00Z"
+          items:
+            $ref: "#/components/schemas/User"
+
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    Pagination:
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+      example:
+        total: 42
+        limit: 20
+        offset: 0
+      properties:
+        total:
+          type: integer
+          example: 42
+
+        limit:
+          type: integer
+          example: 20
+
+        offset:
+          type: integer
+          example: 0
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      example:
+        code: VALIDATION_ERROR
+        message: Email is required.
+        details:
+          field: email
+          reason: required
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+
+        message:
+          type: string
+          example: Email is required.
+
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+          example:
+            field: email
+            reason: required
+
+  examples:
+    ActiveAdminUser:
+      summary: Active admin user
+      value:
+        id: usr_123
+        name: John Doe
+        email: john@example.com
+        status: active
+        role: admin
+        createdAt: "2026-07-04T10:15:00Z"
+
+    InvitedUser:
+      summary: Invited normal user
+      value:
+        id: usr_456
+        name: Jane Smith
+        email: jane@example.com
+        status: invited
+        role: user
+        createdAt: "2026-07-04T11:00:00Z"
