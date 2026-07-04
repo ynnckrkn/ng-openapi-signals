@@ -5,7 +5,8 @@ export default defineConfig({
   format: ['esm'],
   platform: 'node',
   target: 'node24',
-  dts: false,
+  tsconfig: 'tsconfig.dts.json',
+  dts: true,
   clean: true,
   sourcemap: true,
   banner: {
