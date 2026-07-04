@@ -1,6 +1,6 @@
 {
   "name": "ng-openapi-signals",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Signal-first OpenAPI client generator for Angular using resource() and fetch().",
   "type": "module",
   "bin": {
@@ -19,7 +19,7 @@
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "generate:example": "npm run build && node dist/cli.js generate --input examples/openapi.json --output examples/generated"
+    "generate:example": "npm run build && node dist/cli.js generate --input examples/openapi.yml --output examples/generated"
   },
   "keywords": [
     "angular",
