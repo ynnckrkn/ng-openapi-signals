@@ -63,7 +63,22 @@ export function generateApiFiles(operations: OperationModel[]): Record<string, s
 }
 
 function generateService(serviceName: string, operations: OperationModel[]): string {
-  const imports = collectModelImports(operations);
+  const modelImports = collectModelImports(operations);
+  const hasGets = operations.some((op) => op.method === 'get');
+  const hasGetsWithParams = operations.some(
+    (op) => op.method === 'get' && op.pathParams.length + op.queryParams.length > 0,
+  );
+
+  const angularImports = ['Service', 'inject'];
+  if (hasGets) {
+    angularImports.push('resource');
+  }
+
+  const signalUtilImport =
+    hasGetsWithParams
+      ? `import { MaybeSignal, readSignalOrValue } from '../signal-utils';\n`
+      : '';
+  const modelImportLine = modelImports ? `${modelImports}\n` : '';
 
   const methods = operations
     .map((operation) => {
@@ -75,11 +90,9 @@ function generateService(serviceName: string, operations: OperationModel[]): str
     })
     .join('\n\n');
 
-  return `import { Service, inject, resource } from '@angular/core';
+  return `import { ${angularImports.join(', ')} } from '@angular/core';
 import { ApiFetchClient } from '../api-fetch-client';
-import { MaybeSignal, readSignalOrValue } from '../signal-utils';
-${imports}
-
+${signalUtilImport}${modelImportLine}
 @Service()
 export class ${serviceName} {
   private readonly client = inject(ApiFetchClient);
@@ -90,21 +103,35 @@ ${methods}
 }
 
 function generateResourceMethod(operation: OperationModel): string {
+  const hasParams = operation.pathParams.length + operation.queryParams.length > 0;
   const paramsType = generateParamsType(operation);
   const resourceParamsType = generateResolvedParamsType(operation);
   const paramsExpression = generateResourceParamsExpression(operation);
   const pathExpression = generatePathExpression(operation);
   const queryExpression = generateQueryExpression(operation);
+  const paramsArg = hasParams ? `params: ${paramsType}` : '';
+  const paramsFactory = hasParams
+    ? `params: (): ${resourceParamsType} => (${paramsExpression}),`
+    : '';
 
-  return `  ${operation.operationId}Resource(params: ${paramsType}) {
+  const requestLines = [
+    `method: '${operation.method.toUpperCase()}',`,
+    `path: ${pathExpression},`,
+  ];
+
+  if (queryExpression) {
+    requestLines.push(`query: ${queryExpression},`);
+  }
+
+  requestLines.push('signal: abortSignal');
+  const requestBody = requestLines.map((line) => `          ${line}`).join('\n');
+
+  return `  ${operation.operationId}Resource(${paramsArg}) {
     return resource({
-      params: (): ${resourceParamsType} => (${paramsExpression}),
+      ${paramsFactory}
       loader: ({ params, abortSignal }: { params: ${resourceParamsType}; abortSignal: AbortSignal }) =>
         this.client.request<${operation.responseType}>({
-          method: '${operation.method.toUpperCase()}',
-          path: ${pathExpression},
-          ${queryExpression ? `query: ${queryExpression},` : ''}
-          signal: abortSignal
+${requestBody}
         })
     });
   }`;
@@ -130,18 +157,32 @@ ${properties}
 }
 
 function generateMutationMethod(operation: OperationModel): string {
+  const hasParams = operation.pathParams.length + operation.queryParams.length > 0;
   const paramsType = generateParamsType(operation);
   const bodyParameter = operation.requestBodyType ? `body: ${operation.requestBodyType}, ` : '';
+  const paramsParameter = hasParams ? `params: ${paramsType}, ` : '';
   const pathExpression = generatePathExpression(operation);
   const queryExpression = generateQueryExpression(operation);
 
-  return `  ${operation.operationId}(${bodyParameter}params: ${paramsType}, signal?: AbortSignal): Promise<${operation.responseType}> {
+  const requestLines = [
+    `method: '${operation.method.toUpperCase()}',`,
+    `path: ${pathExpression},`,
+  ];
+
+  if (queryExpression) {
+    requestLines.push(`query: ${queryExpression},`);
+  }
+
+  if (operation.requestBodyType) {
+    requestLines.push('body,');
+  }
+
+  requestLines.push('signal');
+  const requestBody = requestLines.map((line) => `      ${line}`).join('\n');
+
+  return `  ${operation.operationId}(${bodyParameter}${paramsParameter}signal?: AbortSignal): Promise<${operation.responseType}> {
     return this.client.request<${operation.responseType}>({
-      method: '${operation.method.toUpperCase()}',
-      path: ${pathExpression},
-      ${queryExpression ? `query: ${queryExpression},` : ''}
-      ${operation.requestBodyType ? 'body,' : ''}
-      signal
+${requestBody}
     });
   }`;
 }
@@ -173,7 +214,7 @@ function generateResourceParamsExpression(operation: OperationModel): string {
   }
 
   const properties = params
-    .map((param) => `        ${param.name}: readSignalOrValue(params.${param.name} as any)`)
+    .map((param) => `        ${param.name}: readSignalOrValue(params.${param.name})`)
     .join(',\n');
 
   return `{
