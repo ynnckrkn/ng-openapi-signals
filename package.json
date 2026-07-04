@@ -1,0 +1,52 @@
+{
+  "name": "ng-openapi-signals",
+  "version": "0.1.0",
+  "description": "Signal-first OpenAPI client generator for Angular using resource() and fetch().",
+  "type": "module",
+  "bin": {
+    "ng-openapi-signals": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsup",
+    "test": "vitest",
+    "format": "prettier --write .",
+    "generate:example": "npm run build && node dist/cli.js generate --input examples/openapi.json --output examples/generated"
+  },
+  "keywords": [
+    "angular",
+    "angular-22",
+    "openapi",
+    "signals",
+    "resource",
+    "fetch",
+    "codegen",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
+    "commander": "^15.0.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "prettier": "^3.9.4",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=22.0.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
