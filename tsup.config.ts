@@ -8,7 +8,7 @@ export default defineConfig({
   tsconfig: 'tsconfig.dts.json',
   dts: true,
   clean: true,
-  sourcemap: true,
+  sourcemap: false,
   banner: {
     js: '#!/usr/bin/env node',
   },

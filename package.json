@@ -1,6 +1,6 @@
 {
   "name": "ng-openapi-signals",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Signal-first OpenAPI client generator for Angular using resource() and fetch().",
   "type": "module",
   "bin": {
@@ -48,6 +48,7 @@
     "@apidevtools/swagger-parser": "^12.1.0",
     "commander": "^15.0.0",
     "jiti": "^2.7.0",
+    "prettier": "^3.9.4",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
@@ -55,7 +56,6 @@
     "@types/node": "^26.1.0",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
-    "prettier": "^3.9.4",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
