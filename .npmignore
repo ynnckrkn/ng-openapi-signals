@@ -1,0 +1,7 @@
+.env
+.env.local
+npm-debug.log
+node_modules
+examples/generated
+.vscode
+.idea
