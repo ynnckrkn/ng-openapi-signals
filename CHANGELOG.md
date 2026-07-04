@@ -7,6 +7,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-04
+
+### Changed
+
+- Changed generated Angular services from `Injectable(...)` output to `Service()` output.
+- Disabled declaration file generation in `tsup.config`.
+- Updated README documentation.
+
+### Added
+
+- Added ESLint configuration.
+- Added Prettier configuration.
+- Added `.npmignore`.
+- Added `CHANGELOG.md` to published package files.
+
+### Chore
+
+- Removed TypeScript 6 deprecation ignore workaround.
+
 ## [0.1.0] - 2026-07-04
 
 ### Added
