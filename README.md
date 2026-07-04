@@ -344,7 +344,7 @@ ng-openapi-signals generate \
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ng-openapi-signals.git
+git clone https://github.com/ynnckrkn/ng-openapi-signals.git
 cd ng-openapi-signals
 ```
 
@@ -398,56 +398,10 @@ The generated files will be written to:
 examples/generated
 ```
 
-## Project Status
-
-This project is currently in early development.
-
-The first goal is to provide a small, focused OpenAPI generator for Angular applications that want to use signal-based APIs with `resource()` and native `fetch()`.
-
 ## Current Scope
 
-Supported in the first MVP:
-
-- OpenAPI 3.x input
-- JSON and YAML specifications
-- TypeScript model generation
-- GET endpoints as `resource()` APIs
-- POST, PUT, PATCH and DELETE endpoints as Promise methods
-- Path parameters
-- Query parameters
-- JSON request bodies
-- JSON responses
-- Basic error handling
-
-Not yet fully supported:
-
-- Advanced OpenAPI parameter serialization styles
-- Multipart form data
-- File upload
-- File download
-- Authentication helpers
-- Custom fetch interceptors
-- Advanced `oneOf`, `anyOf` and discriminator handling
-- Pagination helpers
-- Angular schematics
-- Nx plugin
-
-## Roadmap
-
-Planned improvements:
-
-- Config file support
-- Better enum generation
-- Better nullable handling
-- Better object schema generation
-- Better generated method signatures
-- Auth header hooks
-- Custom fetch middleware
-- File upload and download support
-- More OpenAPI fixtures
-- Vitest test suite
-- GitHub Actions workflow
-- npm release automation
+For the full list of planned features and milestones, see the [Roadmap](./ROADMAP.md).  
+For release notes and version history, see the [Changelog](./CHANGELOG.md).
 
 ## Design Philosophy
 
