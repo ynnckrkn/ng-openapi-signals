@@ -1,10 +1,10 @@
 export function pascalCase(value: string): string {
   return value
-    .replace(/[^a-zA-Z0-9]+/g, " ")
-    .split(" ")
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .split(' ')
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("");
+    .join('');
 }
 
 export function camelCase(value: string): string {
@@ -14,10 +14,10 @@ export function camelCase(value: string): string {
 
 export function kebabCase(value: string): string {
   return value
-    .replace(/([a-z])([A-Z])/g, "$1-$2")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
     .toLowerCase()
-    .replace(/^-|-$/g, "");
+    .replace(/^-|-$/g, '');
 }
 
 export function serviceNameFromTag(tag: string): string {

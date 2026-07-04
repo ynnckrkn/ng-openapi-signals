@@ -148,14 +148,14 @@ The OpenAPI file should usually not be placed in `src/assets`, because it is cod
 Provide the API base URL in your Angular application config:
 
 ```ts
-import { ApplicationConfig } from "@angular/core";
-import { API_BASE_URL } from "./generated/api";
+import {ApplicationConfig} from '@angular/core';
+import {API_BASE_URL} from './generated/api';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     {
       provide: API_BASE_URL,
-      useValue: "https://api.example.com",
+      useValue: 'https://api.example.com',
     },
   ],
 };
@@ -172,11 +172,11 @@ GET /users/{id}
 The generated API can be used like this:
 
 ```ts
-import { Component, inject, signal } from "@angular/core";
-import { UsersApi } from "./generated/api";
+import {Component, inject, signal} from '@angular/core';
+import {UsersApi} from './generated/api';
 
 @Component({
-  selector: "app-user-detail",
+  selector: 'app-user-detail',
   template: `
     @if (user.isLoading()) {
       <p>Loading...</p>
@@ -194,7 +194,7 @@ import { UsersApi } from "./generated/api";
 export class UserDetailComponent {
   private readonly usersApi = inject(UsersApi);
 
-  readonly userId = signal("123");
+  readonly userId = signal('123');
 
   readonly user = this.usersApi.getUserByIdResource({
     id: this.userId,
@@ -248,8 +248,8 @@ Example:
 
 ```ts
 await this.usersApi.createUser({
-  name: "John Doe",
-  email: "john@example.com",
+  name: 'John Doe',
+  email: 'john@example.com',
 });
 ```
 
@@ -282,12 +282,12 @@ The generated `ApiFetchClient` wraps native `fetch()` and handles:
 The generated `API_BASE_URL` token is used to configure the base URL of your backend API.
 
 ```ts
-import { API_BASE_URL } from "./generated/api";
+import {API_BASE_URL} from './generated/api';
 
 providers: [
   {
     provide: API_BASE_URL,
-    useValue: "https://api.example.com",
+    useValue: 'https://api.example.com',
   },
 ];
 ```
@@ -304,7 +304,7 @@ This allows flexible usage:
 
 ```ts
 api.getUserByIdResource({
-  id: "123",
+  id: '123',
 });
 ```
 
@@ -312,7 +312,7 @@ or:
 
 ```ts
 api.getUserByIdResource({
-  id: signal("123"),
+  id: signal('123'),
 });
 ```
 

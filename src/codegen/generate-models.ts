@@ -1,6 +1,6 @@
-import { SchemaModel } from "./types";
-import { kebabCase } from "./naming";
-import { schemaToTsType } from "./schema-to-ts";
+import type {SchemaModel} from './types';
+import {kebabCase} from './naming';
+import {schemaToTsType} from './schema-to-ts';
 
 export function extractSchemas(api: any): SchemaModel[] {
   const schemas = api.components?.schemas ?? {};
@@ -22,19 +22,15 @@ export function extractSchemas(api: any): SchemaModel[] {
   });
 }
 
-export function generateModelFiles(
-  schemas: SchemaModel[],
-): Record<string, string> {
+export function generateModelFiles(schemas: SchemaModel[]): Record<string, string> {
   const files: Record<string, string> = {};
 
   for (const schema of schemas) {
     files[`models/${kebabCase(schema.name)}.ts`] = generateInterface(schema);
   }
 
-  files["models/index.ts"] =
-    schemas
-      .map((schema) => `export * from './${kebabCase(schema.name)}';`)
-      .join("\n") + "\n";
+  files['models/index.ts'] =
+    schemas.map((schema) => `export * from './${kebabCase(schema.name)}';`).join('\n') + '\n';
 
   return files;
 }
@@ -42,10 +38,10 @@ export function generateModelFiles(
 function generateInterface(schema: SchemaModel): string {
   const properties = schema.properties
     .map((property) => {
-      const optional = property.required ? "" : "?";
+      const optional = property.required ? '' : '?';
       return `  ${property.name}${optional}: ${property.type};`;
     })
-    .join("\n");
+    .join('\n');
 
   return `export interface ${schema.name} {
 ${properties}

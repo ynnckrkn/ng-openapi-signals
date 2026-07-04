@@ -1,4 +1,4 @@
-export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
+export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 export interface GenerateOptions {
   input: string;
@@ -7,7 +7,7 @@ export interface GenerateOptions {
 
 export interface ParameterModel {
   name: string;
-  location: "path" | "query";
+  location: 'path' | 'query';
   required: boolean;
   type: string;
 }

@@ -1,11 +1,11 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { format } from "prettier";
-import { loadOpenApi } from "./openapi";
-import { GenerateOptions } from "./codegen/types";
-import { extractSchemas, generateModelFiles } from "./codegen/generate-models";
-import { extractOperations, generateApiFiles } from "./codegen/generate-api";
-import { generateRuntimeFiles } from "./codegen/generate-runtime";
+import {mkdir, rm, writeFile} from 'node:fs/promises';
+import {dirname, join} from 'node:path';
+import {format} from 'prettier';
+import {loadOpenApi} from './openapi';
+import type {GenerateOptions} from './codegen/types';
+import {extractSchemas, generateModelFiles} from './codegen/generate-models';
+import {extractOperations, generateApiFiles} from './codegen/generate-api';
+import {generateRuntimeFiles} from './codegen/generate-runtime';
 
 export async function generate(options: GenerateOptions): Promise<void> {
   const api = await loadOpenApi(options.input);
@@ -26,22 +26,22 @@ export async function generate(options: GenerateOptions): Promise<void> {
     ...generateRuntimeFiles(),
     ...generateModelFiles(schemas),
     ...generateApiFiles(operations),
-    "index.ts": generateIndexFile(),
+    'index.ts': generateIndexFile(),
   };
 
   for (const [fileName, content] of Object.entries(files)) {
     const outputPath = join(options.output, fileName);
     const formatted = await format(withHeader(content), {
-      parser: "typescript",
+      parser: 'typescript',
       singleQuote: true,
-      trailingComma: "none",
+      trailingComma: 'none',
     });
 
     await mkdir(dirname(outputPath), {
       recursive: true,
     });
 
-    await writeFile(outputPath, formatted, "utf8");
+    await writeFile(outputPath, formatted, 'utf8');
   }
 }
 

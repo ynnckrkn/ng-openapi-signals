@@ -1,9 +1,9 @@
 export function generateRuntimeFiles(): Record<string, string> {
   return {
-    "tokens.ts": generateTokens(),
-    "api-error.ts": generateApiError(),
-    "api-fetch-client.ts": generateApiFetchClient(),
-    "signal-utils.ts": generateSignalUtils(),
+    'tokens.ts': generateTokens(),
+    'api-error.ts': generateApiError(),
+    'api-fetch-client.ts': generateApiFetchClient(),
+    'signal-utils.ts': generateSignalUtils(),
   };
 }
 

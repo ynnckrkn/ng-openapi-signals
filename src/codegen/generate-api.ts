@@ -1,16 +1,13 @@
-import { HttpMethod, OperationModel, ParameterModel } from "./types";
-import { kebabCase, serviceNameFromTag } from "./naming";
-import { schemaToTsType } from "./schema-to-ts";
+import type {HttpMethod, OperationModel, ParameterModel} from './types';
+import {kebabCase, serviceNameFromTag} from './naming';
+import {schemaToTsType} from './schema-to-ts';
 
-const HTTP_METHODS: HttpMethod[] = ["get", "post", "put", "patch", "delete"];
+const HTTP_METHODS: HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete'];
 
 export function extractOperations(api: any): OperationModel[] {
   const operations: OperationModel[] = [];
 
-  for (const [path, pathItem] of Object.entries(api.paths ?? {}) as [
-    string,
-    any,
-  ][]) {
+  for (const [path, pathItem] of Object.entries(api.paths ?? {}) as [string, any][]) {
     for (const method of HTTP_METHODS) {
       const operation = pathItem[method];
 
@@ -18,30 +15,27 @@ export function extractOperations(api: any): OperationModel[] {
         continue;
       }
 
-      const parameters = [
-        ...(pathItem.parameters ?? []),
-        ...(operation.parameters ?? []),
-      ];
+      const parameters = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])];
 
       const pathParams = parameters
-        .filter((parameter: any) => parameter.in === "path")
+        .filter((parameter: any) => parameter.in === 'path')
         .map(toParameterModel);
 
       const queryParams = parameters
-        .filter((parameter: any) => parameter.in === "query")
+        .filter((parameter: any) => parameter.in === 'query')
         .map(toParameterModel);
 
       const requestBodyType = extractRequestBodyType(operation);
 
       operations.push({
         operationId: operation.operationId ?? fallbackOperationId(method, path),
-        tag: operation.tags?.[0] ?? "Default",
+        tag: operation.tags?.[0] ?? 'Default',
         method,
         path,
         pathParams,
         queryParams,
         responseType: extractResponseType(operation),
-        ...(requestBodyType ? { requestBodyType } : {}),
+        ...(requestBodyType ? {requestBodyType} : {}),
       });
     }
   }
@@ -49,9 +43,7 @@ export function extractOperations(api: any): OperationModel[] {
   return operations;
 }
 
-export function generateApiFiles(
-  operations: OperationModel[],
-): Record<string, string> {
+export function generateApiFiles(operations: OperationModel[]): Record<string, string> {
   const files: Record<string, string> = {};
   const grouped = groupByTag(operations);
 
@@ -62,29 +54,26 @@ export function generateApiFiles(
     );
   }
 
-  files["resources/index.ts"] =
+  files['resources/index.ts'] =
     Object.keys(grouped)
       .map((tag) => `export * from './${kebabCase(tag)}.api';`)
-      .join("\n") + "\n";
+      .join('\n') + '\n';
 
   return files;
 }
 
-function generateService(
-  serviceName: string,
-  operations: OperationModel[],
-): string {
+function generateService(serviceName: string, operations: OperationModel[]): string {
   const imports = collectModelImports(operations);
 
   const methods = operations
     .map((operation) => {
-      if (operation.method === "get") {
+      if (operation.method === 'get') {
         return generateResourceMethod(operation);
       }
 
       return generateMutationMethod(operation);
     })
-    .join("\n\n");
+    .join('\n\n');
 
   return `import { Injectable, inject, resource } from '@angular/core';
 import { ApiFetchClient } from '../api-fetch-client';
@@ -125,15 +114,15 @@ function generateResolvedParamsType(operation: OperationModel): string {
   const params = [...operation.pathParams, ...operation.queryParams];
 
   if (params.length === 0) {
-    return "undefined";
+    return 'undefined';
   }
 
   const properties = params
     .map((param) => {
-      const optional = param.required ? "" : "?";
+      const optional = param.required ? '' : '?';
       return `    ${param.name}${optional}: ${param.type};`;
     })
-    .join("\n");
+    .join('\n');
 
   return `{
 ${properties}
@@ -142,9 +131,7 @@ ${properties}
 
 function generateMutationMethod(operation: OperationModel): string {
   const paramsType = generateParamsType(operation);
-  const bodyParameter = operation.requestBodyType
-    ? `body: ${operation.requestBodyType}, `
-    : "";
+  const bodyParameter = operation.requestBodyType ? `body: ${operation.requestBodyType}, ` : '';
   const pathExpression = generatePathExpression(operation);
   const queryExpression = generateQueryExpression(operation);
 
@@ -152,8 +139,8 @@ function generateMutationMethod(operation: OperationModel): string {
     return this.client.request<${operation.responseType}>({
       method: '${operation.method.toUpperCase()}',
       path: ${pathExpression},
-      ${queryExpression ? `query: ${queryExpression},` : ""}
-      ${operation.requestBodyType ? "body," : ""}
+      ${queryExpression ? `query: ${queryExpression},` : ''}
+      ${operation.requestBodyType ? 'body,' : ''}
       signal
     });
   }`;
@@ -163,15 +150,15 @@ function generateParamsType(operation: OperationModel): string {
   const params = [...operation.pathParams, ...operation.queryParams];
 
   if (params.length === 0) {
-    return "void";
+    return 'void';
   }
 
   const properties = params
     .map((param) => {
-      const optional = param.required ? "" : "?";
+      const optional = param.required ? '' : '?';
       return `    ${param.name}${optional}: MaybeSignal<${param.type}>;`;
     })
-    .join("\n");
+    .join('\n');
 
   return `{
 ${properties}
@@ -182,15 +169,12 @@ function generateResourceParamsExpression(operation: OperationModel): string {
   const params = [...operation.pathParams, ...operation.queryParams];
 
   if (params.length === 0) {
-    return "undefined";
+    return 'undefined';
   }
 
   const properties = params
-    .map(
-      (param) =>
-        `        ${param.name}: readSignalOrValue(params.${param.name} as any)`,
-    )
-    .join(",\n");
+    .map((param) => `        ${param.name}: readSignalOrValue(params.${param.name} as any)`)
+    .join(',\n');
 
   return `{
 ${properties}
@@ -198,8 +182,7 @@ ${properties}
 }
 
 function generatePathExpression(operation: OperationModel): string {
-  const hasParams =
-    [...operation.pathParams, ...operation.queryParams].length > 0;
+  const hasParams = [...operation.pathParams, ...operation.queryParams].length > 0;
 
   if (!hasParams) {
     return `'${operation.path}'`;
@@ -210,17 +193,17 @@ function generatePathExpression(operation: OperationModel): string {
     (_, name) => `\${encodeURIComponent(String(params.${name}))}`,
   );
 
-  return "`" + templatePath + "`";
+  return '`' + templatePath + '`';
 }
 
 function generateQueryExpression(operation: OperationModel): string {
   if (operation.queryParams.length === 0) {
-    return "";
+    return '';
   }
 
   const properties = operation.queryParams
     .map((param) => `            ${param.name}: params.${param.name}`)
-    .join(",\n");
+    .join(',\n');
 
   return `{
 ${properties}
@@ -239,23 +222,23 @@ function toParameterModel(parameter: any): ParameterModel {
 function extractResponseType(operation: any): string {
   const responses = operation.responses ?? {};
   const response =
-    responses["200"] ??
-    responses["201"] ??
-    responses["202"] ??
-    responses["204"] ??
+    responses['200'] ??
+    responses['201'] ??
+    responses['202'] ??
+    responses['204'] ??
     Object.values(responses)[0];
 
-  const schema = (response as any)?.content?.["application/json"]?.schema;
+  const schema = (response as any)?.content?.['application/json']?.schema;
 
   if (!schema) {
-    return "void";
+    return 'void';
   }
 
   return schemaToTsType(schema);
 }
 
 function extractRequestBodyType(operation: any): string | undefined {
-  const schema = operation.requestBody?.content?.["application/json"]?.schema;
+  const schema = operation.requestBody?.content?.['application/json']?.schema;
 
   if (!schema) {
     return undefined;
@@ -264,25 +247,20 @@ function extractRequestBodyType(operation: any): string | undefined {
   return schemaToTsType(schema);
 }
 
-function groupByTag(
-  operations: OperationModel[],
-): Record<string, OperationModel[]> {
-  return operations.reduce<Record<string, OperationModel[]>>(
-    (result, operation) => {
-      const tagOperations = result[operation.tag] ?? [];
-      tagOperations.push(operation);
-      result[operation.tag] = tagOperations;
-      return result;
-    },
-    {},
-  );
+function groupByTag(operations: OperationModel[]): Record<string, OperationModel[]> {
+  return operations.reduce<Record<string, OperationModel[]>>((result, operation) => {
+    const tagOperations = result[operation.tag] ?? [];
+    tagOperations.push(operation);
+    result[operation.tag] = tagOperations;
+    return result;
+  }, {});
 }
 
 function fallbackOperationId(method: HttpMethod, path: string): string {
   return `${method}_${path}`
-    .replace(/[{}]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/[{}]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 }
 
 function collectModelImports(operations: OperationModel[]): string {
@@ -301,10 +279,10 @@ function collectModelImports(operations: OperationModel[]): string {
   }
 
   if (types.size === 0) {
-    return "";
+    return '';
   }
 
-  return `import { ${Array.from(types).sort().join(", ")} } from '../models';`;
+  return `import { ${Array.from(types).sort().join(', ')} } from '../models';`;
 }
 
 function collectType(type: string, output: Set<string>): void {
@@ -313,26 +291,26 @@ function collectType(type: string, output: Set<string>): void {
   }
 
   const primitives = new Set([
-    "string",
-    "number",
-    "boolean",
-    "void",
-    "unknown",
-    "null",
-    "Record<string, unknown>",
+    'string',
+    'number',
+    'boolean',
+    'void',
+    'unknown',
+    'null',
+    'Record<string, unknown>',
   ]);
 
   if (primitives.has(type)) {
     return;
   }
 
-  if (type.endsWith("[]")) {
+  if (type.endsWith('[]')) {
     collectType(type.slice(0, -2), output);
     return;
   }
 
-  if (type.includes(" | ")) {
-    for (const part of type.split(" | ")) {
+  if (type.includes(' | ')) {
+    for (const part of type.split(' | ')) {
       collectType(part, output);
     }
     return;
