@@ -24,9 +24,10 @@ export function extractSchemas(api: any): SchemaModel[] {
 
 export function generateModelFiles(schemas: SchemaModel[]): Record<string, string> {
   const files: Record<string, string> = {};
+  const schemaNames = new Set(schemas.map((s) => s.name));
 
   for (const schema of schemas) {
-    files[`models/${kebabCase(schema.name)}.ts`] = generateInterface(schema);
+    files[`models/${kebabCase(schema.name)}.ts`] = generateInterface(schema, schemaNames);
   }
 
   files['models/index.ts'] =
@@ -35,7 +36,7 @@ export function generateModelFiles(schemas: SchemaModel[]): Record<string, strin
   return files;
 }
 
-function generateInterface(schema: SchemaModel): string {
+function generateInterface(schema: SchemaModel, allSchemaNames: Set<string>): string {
   const properties = schema.properties
     .map((property) => {
       const optional = property.required ? '' : '?';
@@ -43,8 +44,53 @@ function generateInterface(schema: SchemaModel): string {
     })
     .join('\n');
 
-  return `export interface ${schema.name} {
+  const imports = collectModelImportsForSchema(schema, allSchemaNames);
+
+  return `${imports}export interface ${schema.name} {
 ${properties}
 }
 `;
+}
+
+function collectModelImportsForSchema(schema: SchemaModel, allSchemaNames: Set<string>): string {
+  const types = new Set<string>();
+
+  for (const property of schema.properties) {
+    collectType(property.type, types, allSchemaNames);
+  }
+
+  // Don't import yourself
+  types.delete(schema.name);
+
+  if (types.size === 0) {
+    return '';
+  }
+
+  return `import { ${Array.from(types).sort().join(', ')} } from './index';\n\n`;
+}
+
+function collectType(type: string, output: Set<string>, schemaNames: Set<string>): void {
+  if (!type) {
+    return;
+  }
+
+  if (type.endsWith('[]')) {
+    collectType(type.slice(0, -2), output, schemaNames);
+    return;
+  }
+
+  if (type.includes(' | ')) {
+    for (const part of type.split(' | ')) {
+      collectType(part, output, schemaNames);
+    }
+    return;
+  }
+
+  if (type.startsWith('"') || type.startsWith("'")) {
+    return;
+  }
+
+  if (schemaNames.has(type)) {
+    output.add(type);
+  }
 }
