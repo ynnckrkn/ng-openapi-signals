@@ -1,16 +1,19 @@
-export function generateRuntimeFiles(): Record<string, string> {
+import type {GeneratorConfig} from './types';
+
+export function generateRuntimeFiles(config: GeneratorConfig): Record<string, string> {
   return {
-    'tokens.ts': generateTokens(),
+    'tokens.ts': generateTokens(config),
     'api-error.ts': generateApiError(),
-    'api-fetch-client.ts': generateApiFetchClient(),
+    'api-fetch-client.ts': generateApiFetchClient(config),
     'signal-utils.ts': generateSignalUtils(),
   };
 }
 
-function generateTokens(): string {
+function generateTokens(config: GeneratorConfig): string {
+  const tokenName = config.apiBaseUrlToken;
   return `import { InjectionToken } from '@angular/core';
 
-export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL');
+export const ${tokenName} = new InjectionToken<string>('${tokenName}');
 `;
 }
 
@@ -47,9 +50,10 @@ export async function toApiError(response: Response): Promise<ApiError> {
 `;
 }
 
-function generateApiFetchClient(): string {
+function generateApiFetchClient(config: GeneratorConfig): string {
+  const tokenName = config.apiBaseUrlToken;
   return `import { Service, inject } from '@angular/core';
-import { API_BASE_URL } from './tokens';
+import { ${tokenName} } from './tokens';
 import { toApiError } from './api-error';
 
 export interface ApiRequestOptions {
@@ -63,7 +67,7 @@ export interface ApiRequestOptions {
 
 @Service()
 export class ApiFetchClient {
-  private readonly baseUrl = inject(API_BASE_URL);
+  private readonly baseUrl = inject(${tokenName});
 
   async request<T>(options: ApiRequestOptions): Promise<T> {
     const url = this.buildUrl(options.path, options.query);

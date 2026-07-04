@@ -11,6 +11,9 @@ describe('generated API', () => {
     await generate({
       input: 'examples/openapi.json',
       output: OUTPUT_DIR,
+      clean: true,
+      apiBaseUrlToken: 'API_BASE_URL',
+      groupBy: 'tag',
     });
   });
 

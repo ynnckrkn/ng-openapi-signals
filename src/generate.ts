@@ -2,20 +2,22 @@ import {mkdir, rm, writeFile} from 'node:fs/promises';
 import {dirname, join} from 'node:path';
 import {format} from 'prettier';
 import {loadOpenApi} from './openapi';
-import type {GenerateOptions} from './codegen/types';
+import type {GeneratorConfig} from './codegen/types';
 import {extractSchemas, generateModelFiles} from './codegen/generate-models';
 import {extractOperations, generateApiFiles} from './codegen/generate-api';
 import {generateRuntimeFiles} from './codegen/generate-runtime';
 
-export async function generate(options: GenerateOptions): Promise<void> {
-  const api = await loadOpenApi(options.input);
+export async function generate(config: GeneratorConfig): Promise<void> {
+  const api = await loadOpenApi(config.input);
 
-  await rm(options.output, {
-    recursive: true,
-    force: true,
-  });
+  if (config.clean) {
+    await rm(config.output, {
+      recursive: true,
+      force: true,
+    });
+  }
 
-  await mkdir(options.output, {
+  await mkdir(config.output, {
     recursive: true,
   });
 
@@ -23,14 +25,14 @@ export async function generate(options: GenerateOptions): Promise<void> {
   const operations = extractOperations(api);
 
   const files: Record<string, string> = {
-    ...generateRuntimeFiles(),
+    ...generateRuntimeFiles(config),
     ...generateModelFiles(schemas),
-    ...generateApiFiles(operations),
+    ...generateApiFiles(operations, config),
     'index.ts': generateIndexFile(),
   };
 
   for (const [fileName, content] of Object.entries(files)) {
-    const outputPath = join(options.output, fileName);
+    const outputPath = join(config.output, fileName);
     const formatted = await format(withHeader(content), {
       parser: 'typescript',
       singleQuote: true,

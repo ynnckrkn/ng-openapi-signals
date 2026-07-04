@@ -1,5 +1,17 @@
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
+export type GroupBy = 'tag' | 'path';
+
+export interface GeneratorConfig {
+  input: string;
+  output: string;
+  clean: boolean;
+  apiBaseUrlToken: string;
+  groupBy: GroupBy;
+}
+
+export type PartialGeneratorConfig = Partial<GeneratorConfig>;
+
 export interface GenerateOptions {
   input: string;
   output: string;

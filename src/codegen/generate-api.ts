@@ -1,4 +1,4 @@
-import type {HttpMethod, OperationModel, ParameterModel} from './types';
+import type {GeneratorConfig, HttpMethod, OperationModel, ParameterModel} from './types';
 import {kebabCase, serviceNameFromTag} from './naming';
 import {schemaToTsType} from './schema-to-ts';
 
@@ -43,20 +43,24 @@ export function extractOperations(api: any): OperationModel[] {
   return operations;
 }
 
-export function generateApiFiles(operations: OperationModel[]): Record<string, string> {
+export function generateApiFiles(
+  operations: OperationModel[],
+  config: GeneratorConfig,
+): Record<string, string> {
   const files: Record<string, string> = {};
-  const grouped = groupByTag(operations);
+  const grouped =
+    config.groupBy === 'path' ? groupByPath(operations) : groupByTag(operations);
 
-  for (const [tag, tagOperations] of Object.entries(grouped)) {
-    files[`resources/${kebabCase(tag)}.api.ts`] = generateService(
-      serviceNameFromTag(tag),
-      tagOperations,
+  for (const [group, groupOperations] of Object.entries(grouped)) {
+    files[`resources/${kebabCase(group)}.api.ts`] = generateService(
+      serviceNameFromTag(group),
+      groupOperations,
     );
   }
 
   files['resources/index.ts'] =
     Object.keys(grouped)
-      .map((tag) => `export * from './${kebabCase(tag)}.api';`)
+      .map((group) => `export * from './${kebabCase(group)}.api';`)
       .join('\n') + '\n';
 
   return files;
@@ -295,6 +299,21 @@ function groupByTag(operations: OperationModel[]): Record<string, OperationModel
     result[operation.tag] = tagOperations;
     return result;
   }, {});
+}
+
+function groupByPath(operations: OperationModel[]): Record<string, OperationModel[]> {
+  return operations.reduce<Record<string, OperationModel[]>>((result, operation) => {
+    const group = pathGroupName(operation.path);
+    const groupOperations = result[group] ?? [];
+    groupOperations.push(operation);
+    result[group] = groupOperations;
+    return result;
+  }, {});
+}
+
+function pathGroupName(path: string): string {
+  const segments = path.split('/').filter(Boolean);
+  return segments[0] ?? 'Default';
 }
 
 function fallbackOperationId(method: HttpMethod, path: string): string {

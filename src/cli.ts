@@ -1,26 +1,46 @@
 import {Command} from 'commander';
 import {generate} from './generate';
+import {loadConfig, resolveConfig, validateConfig} from './config';
+import {isGroupBy} from './config';
 
 const program = new Command();
 
 program
   .name('ng-openapi-signals')
   .description('Signal-first OpenAPI client generator for Angular using resource() and fetch().')
-  .version('0.1.2');
+  .version('0.2.0');
 
 program
   .command('generate')
   .description('Generate an Angular signal-based OpenAPI client')
-  .requiredOption('-i, --input <path>', 'Path to OpenAPI JSON/YAML file')
-  .requiredOption('-o, --output <path>', 'Output directory')
+  .option('-i, --input <path>', 'Path to OpenAPI JSON/YAML file')
+  .option('-o, --output <path>', 'Output directory')
+  .option('-c, --config <path>', 'Path to config file (default: ng-openapi-signals.config.ts)')
+  .option('--clean', 'Clean output directory before generation (default: true)')
+  .option('--no-clean', 'Preserve existing files in output directory')
+  .option('--api-base-url-token <name>', 'Name of the API base URL InjectionToken')
+  .option('--group-by <mode>', 'Group APIs by tag or path (default: tag)')
   .action(async (options) => {
     try {
-      await generate({
-        input: options.input,
-        output: options.output,
-      });
+      const fileConfig = await loadConfig(options.config);
 
-      console.log(`Generated API client in ${options.output}`);
+      const cliConfig = {
+        ...(options.input ? {input: options.input} : {}),
+        ...(options.output ? {output: options.output} : {}),
+        ...(options.clean !== undefined ? {clean: options.clean} : {}),
+        ...(options.apiBaseUrlToken ? {apiBaseUrlToken: options.apiBaseUrlToken} : {}),
+        ...(options.groupBy !== undefined && isGroupBy(options.groupBy)
+          ? {groupBy: options.groupBy}
+          : {}),
+      };
+
+      const config = resolveConfig(cliConfig, fileConfig);
+
+      validateConfig(config);
+
+      await generate(config);
+
+      console.log(`Generated API client in ${config.output}`);
     } catch (error) {
       console.error(error);
       process.exitCode = 1;

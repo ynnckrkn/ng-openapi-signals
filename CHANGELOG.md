@@ -7,6 +7,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-04
+
+### Added
+
+- Added config file support via `ng-openapi-signals.config.ts` with `defineConfig()` helper.
+- Added `--config <path>` CLI flag to specify a custom config file path.
+- Added `--clean` / `--no-clean` CLI flags to control output directory cleaning.
+- Added `--api-base-url-token <name>` CLI flag to customize the generated `InjectionToken` name.
+- Added `--group-by <tag|path>` CLI flag to group generated APIs by tag or path segment.
+- Added `jiti` as a runtime dependency for loading TypeScript config files.
+- Added config tests covering loading, merging, validation, and defaults.
+- Added generate tests for `clean: false`, custom token names, and path-based grouping.
+- Added "Configuration" section to README with environment integration examples.
+
+### Changed
+
+- CLI flags `-i/--input` and `-o/--output` are now optional (can be provided via config file).
+- CLI flags override config file values; config file values override defaults.
+- `generate()` now accepts a `GeneratorConfig` object instead of `GenerateOptions`.
+- `generateRuntimeFiles()` and `generateApiFiles()` now accept a `GeneratorConfig` parameter.
+- The `API_BASE_URL` token name is now configurable via `config.apiBaseUrlToken`.
+- API grouping can now be switched between tag-based and path-based via `config.groupBy`.
+- Updated Angular Setup and `API_BASE_URL` documentation to reference environment files.
+- Updated CLI options table in README with all new flags.
+- Bumped CLI version to `0.2.0`.
+
 ## [0.1.2] - 2026-07-04
 
 ### Fixed
