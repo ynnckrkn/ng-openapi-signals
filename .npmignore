@@ -5,3 +5,6 @@ node_modules
 examples/generated
 .vscode
 .idea
+AGENTS.md
+.prettierrc
+eslint.config.js
