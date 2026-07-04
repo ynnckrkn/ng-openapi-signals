@@ -48,7 +48,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
 }
 
 function generateApiFetchClient(): string {
-  return `import { Injectable, inject } from '@angular/core';
+  return `import { Service, inject } from '@angular/core';
 import { API_BASE_URL } from './tokens';
 import { toApiError } from './api-error';
 
@@ -61,7 +61,7 @@ export interface ApiRequestOptions {
   signal?: AbortSignal;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ApiFetchClient {
   private readonly baseUrl = inject(API_BASE_URL);
 

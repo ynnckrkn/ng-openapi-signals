@@ -75,12 +75,12 @@ function generateService(serviceName: string, operations: OperationModel[]): str
     })
     .join('\n\n');
 
-  return `import { Injectable, inject, resource } from '@angular/core';
+  return `import { Service, inject, resource } from '@angular/core';
 import { ApiFetchClient } from '../api-fetch-client';
 import { MaybeSignal, readSignalOrValue } from '../signal-utils';
 ${imports}
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ${serviceName} {
   private readonly client = inject(ApiFetchClient);
 
