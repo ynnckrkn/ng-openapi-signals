@@ -84,13 +84,13 @@ export class ApiFetchClient {
     }
 
     if (response.status === 204) {
-      return undefined as T;
+      return undefined as unknown as T;
     }
 
     const contentType = response.headers.get('content-type');
 
     if (!contentType?.includes('application/json')) {
-      return undefined as T;
+      return undefined as unknown as T;
     }
 
     return response.json() as Promise<T>;
