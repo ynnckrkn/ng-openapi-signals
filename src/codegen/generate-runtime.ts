@@ -1,19 +1,31 @@
 import type {GeneratorConfig} from './types';
 
-export function generateRuntimeFiles(config: GeneratorConfig): Record<string, string> {
+export function generateRuntimeFiles(_config: GeneratorConfig): Record<string, string> {
   return {
-    'tokens.ts': generateTokens(config),
+    'providers.ts': generateProviders(),
     'api-error.ts': generateApiError(),
-    'api-fetch-client.ts': generateApiFetchClient(config),
+    'api-fetch-client.ts': generateApiFetchClient(),
     'signal-utils.ts': generateSignalUtils(),
   };
 }
 
-function generateTokens(config: GeneratorConfig): string {
-  const tokenName = config.apiBaseUrlToken;
-  return `import { InjectionToken } from '@angular/core';
+function generateProviders(): string {
+  return `import { EnvironmentProviders, InjectionToken, makeEnvironmentProviders } from '@angular/core';
 
-export const ${tokenName} = new InjectionToken<string>('${tokenName}');
+export const NG_OPENAPI_SIGNALS_BASE_PATH = new InjectionToken<string>('NG_OPENAPI_SIGNALS_BASE_PATH');
+
+export interface NgOpenapiSignalsOptions {
+  basePath: string;
+}
+
+export function provideNgOpenapiSignals(options: NgOpenapiSignalsOptions): EnvironmentProviders {
+  return makeEnvironmentProviders([
+    {
+      provide: NG_OPENAPI_SIGNALS_BASE_PATH,
+      useValue: options.basePath
+    }
+  ]);
+}
 `;
 }
 
@@ -50,10 +62,9 @@ export async function toApiError(response: Response): Promise<ApiError> {
 `;
 }
 
-function generateApiFetchClient(config: GeneratorConfig): string {
-  const tokenName = config.apiBaseUrlToken;
+function generateApiFetchClient(): string {
   return `import { Service, inject } from '@angular/core';
-import { ${tokenName} } from './tokens';
+import { NG_OPENAPI_SIGNALS_BASE_PATH } from './providers';
 import { toApiError } from './api-error';
 
 export interface ApiRequestOptions {
@@ -67,7 +78,7 @@ export interface ApiRequestOptions {
 
 @Service()
 export class ApiFetchClient {
-  private readonly baseUrl = inject(${tokenName});
+  private readonly baseUrl = inject(NG_OPENAPI_SIGNALS_BASE_PATH);
 
   async request<T>(options: ApiRequestOptions): Promise<T> {
     const url = this.buildUrl(options.path, options.query);

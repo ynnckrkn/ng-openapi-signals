@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('ng-openapi-signals')
   .description('Signal-first OpenAPI client generator for Angular using resource() and fetch().')
-  .version('0.2.1');
+  .version('0.3.0');
 
 program
   .command('generate')
@@ -18,7 +18,6 @@ program
   .option('-c, --config <path>', 'Path to config file (default: ng-openapi-signals.config.ts)')
   .option('--clean', 'Clean output directory before generation (default: true)')
   .option('--no-clean', 'Preserve existing files in output directory')
-  .option('--api-base-url-token <name>', 'Name of the API base URL InjectionToken')
   .option('--group-by <mode>', 'Group APIs by tag or path (default: tag)')
   .action(async (options) => {
     try {
@@ -28,7 +27,6 @@ program
         ...(options.input ? {input: options.input} : {}),
         ...(options.output ? {output: options.output} : {}),
         ...(options.clean !== undefined ? {clean: options.clean} : {}),
-        ...(options.apiBaseUrlToken ? {apiBaseUrlToken: options.apiBaseUrlToken} : {}),
         ...(options.groupBy !== undefined && isGroupBy(options.groupBy)
           ? {groupBy: options.groupBy}
           : {}),

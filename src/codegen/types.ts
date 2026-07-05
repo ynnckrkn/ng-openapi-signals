@@ -6,7 +6,6 @@ export interface GeneratorConfig {
   input: string;
   output: string;
   clean: boolean;
-  apiBaseUrlToken: string;
   groupBy: GroupBy;
 }
 

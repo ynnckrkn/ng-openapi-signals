@@ -48,7 +48,7 @@ export async function generate(config: GeneratorConfig): Promise<void> {
 }
 
 function generateIndexFile(): string {
-  return `export * from './tokens';
+  return `export * from './providers';
 export * from './api-error';
 export * from './api-fetch-client';
 export * from './signal-utils';

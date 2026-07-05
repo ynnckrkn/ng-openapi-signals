@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-05
+
+### Changed
+
+- Switched generated base URL configuration to the provider-based helper `provideNgOpenapiSignals({ basePath })`.
+
+### BREAKING CHANGE
+
+- The generated `API_BASE_URL` token approach has been replaced.
+- Consumers must now register the base URL via `provideNgOpenapiSignals({ basePath: 'https://...' })` instead of providing `API_BASE_URL` manually.
+- The `apiBaseUrlToken` config option and the `--api-base-url-token` CLI flag have been removed.
+
 ## [0.2.2] - 2026-07-05
 
 ### Fixed

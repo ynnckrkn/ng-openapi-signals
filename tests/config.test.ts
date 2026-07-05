@@ -38,14 +38,14 @@ describe('config', () => {
       const configPath = join(TMP_DIR, 'ng-openapi-signals.config.ts');
       await writeFile(
         configPath,
-        `export default {\n  input: './openapi.json',\n  output: './src/generated/api',\n  apiBaseUrlToken: 'CUSTOM_API_URL',\n};\n`,
+        `export default {\n  input: './openapi.json',\n  output: './src/generated/api',\n  groupBy: 'path',\n};\n`,
         'utf8',
       );
 
       const config = await loadConfig(configPath);
       expect(config.input).toBe('./openapi.json');
       expect(config.output).toBe('./src/generated/api');
-      expect(config.apiBaseUrlToken).toBe('CUSTOM_API_URL');
+      expect(config.groupBy).toBe('path');
     });
   });
 
@@ -53,26 +53,18 @@ describe('config', () => {
     it('uses defaults when no overrides provided', () => {
       const config = resolveConfig({}, {});
       expect(config.clean).toBe(DEFAULT_CONFIG.clean);
-      expect(config.apiBaseUrlToken).toBe(DEFAULT_CONFIG.apiBaseUrlToken);
       expect(config.groupBy).toBe(DEFAULT_CONFIG.groupBy);
     });
 
     it('file config overrides defaults', () => {
-      const config = resolveConfig(
-        {},
-        {input: './openapi.json', output: './out', apiBaseUrlToken: 'FILE_TOKEN'},
-      );
+      const config = resolveConfig({}, {input: './openapi.json', output: './out'});
       expect(config.input).toBe('./openapi.json');
       expect(config.output).toBe('./out');
-      expect(config.apiBaseUrlToken).toBe('FILE_TOKEN');
     });
 
     it('CLI options override file config', () => {
-      const config = resolveConfig(
-        {apiBaseUrlToken: 'CLI_TOKEN'},
-        {apiBaseUrlToken: 'FILE_TOKEN'},
-      );
-      expect(config.apiBaseUrlToken).toBe('CLI_TOKEN');
+      const config = resolveConfig({groupBy: 'path'}, {groupBy: 'tag'});
+      expect(config.groupBy).toBe('path');
     });
 
     it('CLI clean=false overrides file clean=true', () => {

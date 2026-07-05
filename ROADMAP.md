@@ -21,7 +21,13 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - Add option to customize the API base URL token name.
 - Add option to group generated APIs by tags or paths.
 
-## 0.3.x - Better OpenAPI Support
+## 0.3.0 - Provider-based Base URL Configuration
+
+- Introduce the generated `provideNgOpenapiSignals({ basePath })` helper as the default way to configure the API base URL.
+- Replace the old `API_BASE_URL` token-based setup in generated clients and examples.
+- Document the migration path for existing consumers.
+
+## 0.4.x - Better OpenAPI Support
 
 - Improve enum generation.
 - Improve nullable type handling.
@@ -31,7 +37,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - Improve fallback names for missing `operationId`.
 - Add support for more success response status codes.
 
-## 0.4.x - Fetch Runtime Improvements
+## 0.5.x - Fetch Runtime Improvements
 
 - Add fetch middleware support.
 - Add auth header hooks.
@@ -41,7 +47,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - Add better handling for non-JSON responses.
 - Add support for `Blob`, `ArrayBuffer` and plain text responses.
 
-## 0.5.x - Advanced Request Support
+## 0.6.x - Advanced Request Support
 
 - Add advanced query parameter serialization.
 - Support OpenAPI parameter styles.
@@ -50,7 +56,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - Add file download support.
 - Add support for custom content types.
 
-## 0.6.x - Developer Experience
+## 0.7.x - Developer Experience
 
 - Add better CLI output.
 - Add `--watch` mode.
@@ -60,7 +66,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - Add more example projects.
 - Add Angular example app.
 
-## 0.7.x - Testing and Quality
+## 0.8.x - Testing and Quality
 
 - Add fixture-based generator tests.
 - Add snapshot tests for generated output.

@@ -67,7 +67,7 @@ src/generated/api/
   api-error.ts
   api-fetch-client.ts
   signal-utils.ts
-  tokens.ts
+  providers.ts
   index.ts
   models/
     user.ts
@@ -157,14 +157,13 @@ Provide the API base URL in your Angular application config:
 
 ```ts
 import {ApplicationConfig} from '@angular/core';
-import {API_BASE_URL} from './generated/api';
+import {provideNgOpenapiSignals} from './generated/api';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    {
-      provide: API_BASE_URL,
-      useValue: 'https://api.example.com',
-    },
+    provideNgOpenapiSignals({
+      basePath: 'https://api.example.com',
+    }),
   ],
 };
 ```
@@ -285,19 +284,17 @@ The generated `ApiFetchClient` wraps native `fetch()` and handles:
 - Abort signals
 - Basic error handling
 
-### `API_BASE_URL`
+### `provideNgOpenapiSignals()`
 
-The generated `API_BASE_URL` token is used to configure the base URL of your backend API.
-The token name can be customized via the `apiBaseUrlToken` config option.
+The generated helper configures the base URL of your backend API.
 
 ```ts
-import {API_BASE_URL} from './generated/api';
+import {provideNgOpenapiSignals} from './generated/api';
 
 providers: [
-  {
-    provide: API_BASE_URL,
-    useValue: 'https://api.example.com',
-  },
+  provideNgOpenapiSignals({
+    basePath: 'https://api.example.com',
+  }),
 ];
 ```
 
@@ -338,7 +335,6 @@ export default defineConfig({
   input: './openapi.json',
   output: './src/generated/api',
   clean: true,
-  apiBaseUrlToken: 'API_BASE_URL',
   groupBy: 'tag',
 });
 ```
@@ -350,7 +346,6 @@ export default defineConfig({
 | `input`           | `string`          | —                | Path to the OpenAPI JSON or YAML file                   |
 | `output`          | `string`          | —                | Output directory for the generated Angular client       |
 | `clean`           | `boolean`         | `true`           | Clean output directory before generation                |
-| `apiBaseUrlToken` | `string`          | `'API_BASE_URL'` | Name of the generated API base URL `InjectionToken`     |
 | `groupBy`         | `'tag' \| 'path'` | `'tag'`          | Group generated APIs by OpenAPI tag or URL path segment |
 
 ### CLI overrides
@@ -361,8 +356,7 @@ CLI flags override config file values. Config file values override defaults.
 ng-openapi-signals generate \
   --input ./openapi.json \
   --output ./src/generated/api \
-  --group-by path \
-  --api-base-url-token CUSTOM_API_URL
+  --group-by path
 ```
 
 ### Grouping
@@ -372,29 +366,6 @@ Each tag becomes one service file: `resources/<tag>.api.ts`.
 
 Set `groupBy: 'path'` to group by the first path segment instead.
 For example, `/users/{id}` and `/users` are grouped into `resources/users.api.ts`.
-
-### Custom token name
-
-Use `apiBaseUrlToken` to customize the generated `InjectionToken` name:
-
-```ts
-export default defineConfig({
-  input: './openapi.json',
-  output: './src/generated/api',
-  apiBaseUrlToken: 'CUSTOM_API_URL',
-});
-```
-
-This generates:
-
-```ts
-export const CUSTOM_API_URL = new InjectionToken<string>('CUSTOM_API_URL');
-```
-
-Use cases:
-
-- Avoid naming collisions with existing tokens in your project.
-- Adapt to project naming conventions (e.g. `API_URL` instead of `API_BASE_URL`).
 
 ### Preserving output
 
@@ -433,7 +404,6 @@ ng-openapi-signals generate \
 | `-c, --config <path>`         | Path to config file (default: `ng-openapi-signals.config.ts`) |
 | `--clean`                     | Clean output directory before generation (default: true)      |
 | `--no-clean`                  | Preserve existing files in output directory                   |
-| `--api-base-url-token <name>` | Name of the API base URL InjectionToken                       |
 | `--group-by <tag\|path>`      | Group APIs by tag or path (default: tag)                      |
 
 ## Local Development

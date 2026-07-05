@@ -19,12 +19,11 @@ describe('generate', () => {
       input: 'examples/openapi.json',
       output: OUTPUT_DIR,
       clean: true,
-      apiBaseUrlToken: 'API_BASE_URL',
       groupBy: 'tag',
     });
 
     const expectedFiles = [
-      'tokens.ts',
+      'providers.ts',
       'api-error.ts',
       'api-fetch-client.ts',
       'signal-utils.ts',
@@ -46,7 +45,6 @@ describe('generate', () => {
       input: 'examples/openapi.json',
       output: OUTPUT_DIR,
       clean: true,
-      apiBaseUrlToken: 'API_BASE_URL',
       groupBy: 'tag',
     });
 
@@ -63,7 +61,6 @@ describe('generate', () => {
       input: 'examples/openapi.json',
       output: OUTPUT_DIR,
       clean: false,
-      apiBaseUrlToken: 'API_BASE_URL',
       groupBy: 'tag',
     });
 
@@ -71,21 +68,21 @@ describe('generate', () => {
     expect(content).toBe('keep me');
   });
 
-  it('uses custom API base URL token name', async () => {
+  it('generates a provider helper for the base path', async () => {
     await generate({
       input: 'examples/openapi.json',
       output: OUTPUT_DIR,
       clean: true,
-      apiBaseUrlToken: 'CUSTOM_API_URL',
       groupBy: 'tag',
     });
 
-    const tokensContent = await readFile(join(OUTPUT_DIR, 'tokens.ts'), 'utf8');
-    expect(tokensContent).toContain('export const CUSTOM_API_URL');
+    const providersContent = await readFile(join(OUTPUT_DIR, 'providers.ts'), 'utf8');
+    expect(providersContent).toContain('export function provideNgOpenapiSignals');
+    expect(providersContent).toContain('basePath');
 
     const clientContent = await readFile(join(OUTPUT_DIR, 'api-fetch-client.ts'), 'utf8');
-    expect(clientContent).toContain("import { CUSTOM_API_URL } from './tokens'");
-    expect(clientContent).toContain('inject(CUSTOM_API_URL)');
+    expect(clientContent).toContain("import { NG_OPENAPI_SIGNALS_BASE_PATH } from './providers'");
+    expect(clientContent).toContain('inject(NG_OPENAPI_SIGNALS_BASE_PATH)');
   });
 
   it('groups by path when groupBy is path', async () => {
@@ -93,7 +90,6 @@ describe('generate', () => {
       input: 'examples/openapi.json',
       output: OUTPUT_DIR,
       clean: true,
-      apiBaseUrlToken: 'API_BASE_URL',
       groupBy: 'path',
     });
 

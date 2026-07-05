@@ -8,7 +8,6 @@ export const DEFAULT_CONFIG: GeneratorConfig = {
   input: '',
   output: '',
   clean: true,
-  apiBaseUrlToken: 'API_BASE_URL',
   groupBy: 'tag',
 };
 
@@ -22,7 +21,7 @@ export const DEFAULT_CONFIG_FILE = 'ng-openapi-signals.config.ts';
  * export default defineConfig({
  *   input: './openapi.json',
  *   output: './src/generated/api',
- *   apiBaseUrlToken: 'API_BASE_URL',
+ *   groupBy: 'tag',
  * });
  * ```
  */
@@ -61,10 +60,6 @@ export function resolveConfig(
     input: cliOptions.input ?? fileConfig.input ?? DEFAULT_CONFIG.input,
     output: cliOptions.output ?? fileConfig.output ?? DEFAULT_CONFIG.output,
     clean: cliOptions.clean ?? fileConfig.clean ?? DEFAULT_CONFIG.clean,
-    apiBaseUrlToken:
-      cliOptions.apiBaseUrlToken ??
-      fileConfig.apiBaseUrlToken ??
-      DEFAULT_CONFIG.apiBaseUrlToken,
     groupBy: cliOptions.groupBy ?? fileConfig.groupBy ?? DEFAULT_CONFIG.groupBy,
   };
 }
