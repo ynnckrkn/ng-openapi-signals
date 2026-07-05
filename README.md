@@ -17,7 +17,7 @@ GET endpoints are generated as Angular `resource()` APIs, while mutating endpoin
 - JSON request body support
 - JSON response handling
 - Basic API error handling
-- Base URL configuration via Angular `InjectionToken`
+- Base URL configuration via `provideNgOpenapiSignals()`
 
 ## Requirements
 
@@ -270,7 +270,7 @@ The generated client includes a small runtime:
 api-fetch-client.ts
 api-error.ts
 signal-utils.ts
-tokens.ts
+providers.ts
 ```
 
 ### `ApiFetchClient`

@@ -85,6 +85,21 @@ describe('generate', () => {
     expect(clientContent).toContain('inject(NG_OPENAPI_SIGNALS_BASE_PATH)');
   });
 
+  it('generates a provider with the expected DI structure', async () => {
+    await generate({
+      input: 'examples/openapi.json',
+      output: OUTPUT_DIR,
+      clean: true,
+      groupBy: 'tag',
+    });
+
+    const providersContent = await readFile(join(OUTPUT_DIR, 'providers.ts'), 'utf8');
+    expect(providersContent).toContain('NG_OPENAPI_SIGNALS_BASE_PATH');
+    expect(providersContent).toContain('NgOpenapiSignalsOptions');
+    expect(providersContent).toContain('makeEnvironmentProviders');
+    expect(providersContent).toContain('EnvironmentProviders');
+  });
+
   it('groups by path when groupBy is path', async () => {
     await generate({
       input: 'examples/openapi.json',
