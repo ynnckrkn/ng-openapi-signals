@@ -1,5 +1,5 @@
 import type {GeneratorConfig, HttpMethod, OperationModel, ParameterModel} from './types';
-import {kebabCase, serviceNameFromTag} from './naming';
+import {camelCase, kebabCase, pascalCase, serviceNameFromTag} from './naming';
 import {schemaToTsType} from './schema-to-ts';
 
 const HTTP_METHODS: HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete'];
@@ -266,24 +266,92 @@ function toParameterModel(parameter: any): ParameterModel {
 
 function extractResponseType(operation: any): string {
   const responses = operation.responses ?? {};
-  const response =
-    responses['200'] ??
-    responses['201'] ??
-    responses['202'] ??
-    responses['204'] ??
-    Object.values(responses)[0];
 
-  const schema = (response as any)?.content?.['application/json']?.schema;
+  // Collect all 2xx response schemas (including 2XX range from OpenAPI 3.1).
+  const successSchemas: string[] = [];
+
+  for (const [statusCode, response] of Object.entries(responses)) {
+    if (!isSuccessStatus(statusCode)) {
+      continue;
+    }
+
+    const schema = extractSchemaFromResponse(response);
+
+    // 204 / no content → void; skip adding to the union.
+    if (!schema || schema === 'void') {
+      continue;
+    }
+
+    successSchemas.push(schema);
+  }
+
+  if (successSchemas.length === 0) {
+    return 'void';
+  }
+
+  // Deduplicate while preserving order.
+  const unique = Array.from(new Set(successSchemas));
+
+  if (unique.length === 1) {
+    return unique[0]!;
+  }
+
+  return unique.join(' | ');
+}
+
+function isSuccessStatus(statusCode: string): boolean {
+  if (statusCode === 'default') {
+    return false;
+  }
+
+  // Exact 2xx codes: 200, 201, ...
+  if (/^2\d\d$/.test(statusCode)) {
+    return true;
+  }
+
+  // OpenAPI 3.1 range: 2XX
+  if (/^2XX$/i.test(statusCode)) {
+    return true;
+  }
+
+  return false;
+}
+
+function extractSchemaFromResponse(response: any): string | undefined {
+  if (!response?.content) {
+    return undefined;
+  }
+
+  // Try common JSON content types, then */*.
+  const jsonContent =
+    response.content['application/json'] ??
+    Object.values(response.content).find((c: any) => isJsonContentType(c)) as any | undefined;
+
+  const content = jsonContent ?? response.content['*/*'];
+
+  const schema = content?.schema;
 
   if (!schema) {
-    return 'void';
+    return undefined;
   }
 
   return schemaToTsType(schema);
 }
 
+function isJsonContentType(content: any): boolean {
+  // Heuristic: any content type that looks like JSON (application/json, application/vnd.foo+json).
+  // The content object itself doesn't carry the mime type, so this is a fallback.
+  return Boolean(content?.schema);
+}
+
 function extractRequestBodyType(operation: any): string | undefined {
-  const schema = operation.requestBody?.content?.['application/json']?.schema;
+  const content = operation.requestBody?.content;
+  if (!content) {
+    return undefined;
+  }
+
+  const jsonContent = content['application/json'] ?? Object.values(content).find((c: any) => c?.schema) as any | undefined;
+  const schema = jsonContent?.schema;
 
   if (!schema) {
     return undefined;
@@ -317,10 +385,37 @@ function pathGroupName(path: string): string {
 }
 
 function fallbackOperationId(method: HttpMethod, path: string): string {
-  return `${method}_${path}`
-    .replace(/[{}]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+  const segments = path.split('/').filter(Boolean);
+  const methodPrefix = methodVerbPrefix(method);
+  const nameParts: string[] = [methodPrefix];
+
+  for (const segment of segments) {
+    const paramMatch = segment.match(/^\{(.+)\}$/);
+
+    if (paramMatch) {
+      nameParts.push('By', pascalCase(paramMatch[1]!));
+    } else {
+      nameParts.push(pascalCase(segment));
+    }
+  }
+
+  return camelCase(nameParts.join(''));
+}
+
+function methodVerbPrefix(method: HttpMethod): string {
+  switch (method) {
+    case 'get':
+      return 'get';
+    case 'post':
+      return 'create';
+    case 'put':
+    case 'patch':
+      return 'update';
+    case 'delete':
+      return 'delete';
+    default:
+      return method;
+  }
 }
 
 function collectModelImports(operations: OperationModel[]): string {
@@ -369,14 +464,34 @@ function collectType(type: string, output: Set<string>): void {
     return;
   }
 
-  if (type.includes(' | ')) {
-    for (const part of type.split(' | ')) {
-      collectType(part, output);
+  if (type.startsWith('Record<string, ') && type.endsWith('>')) {
+    const inner = type.slice('Record<string, '.length, -1);
+    collectType(inner, output);
+    return;
+  }
+
+  if (type.includes(' | ') || type.includes(' & ')) {
+    for (const part of type.split(/[ |&]+/)) {
+      collectType(part.trim(), output);
     }
     return;
   }
 
   if (type.startsWith('"') || type.startsWith("'")) {
+    return;
+  }
+
+  // Inline object type literal — no imports needed.
+  if (type.startsWith('{')) {
+    return;
+  }
+
+  // Tuple type — recurse into elements.
+  if (type.startsWith('[') && type.endsWith(']')) {
+    const inner = type.slice(1, -1);
+    for (const part of inner.split(', ')) {
+      collectType(part.trim(), output);
+    }
     return;
   }
 

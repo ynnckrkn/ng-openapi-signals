@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('ng-openapi-signals')
   .description('Signal-first OpenAPI client generator for Angular using resource() and fetch().')
-  .version('0.3.0');
+  .version('0.4.0');
 
 program
   .command('generate')

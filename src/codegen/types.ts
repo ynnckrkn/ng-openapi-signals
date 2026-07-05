@@ -34,9 +34,18 @@ export interface OperationModel {
   requestBodyType?: string;
 }
 
+export type SchemaModelKind = 'interface' | 'enum' | 'alias';
+
 export interface SchemaModel {
   name: string;
+  kind: SchemaModelKind;
   properties: SchemaPropertyModel[];
+  /** Present when `kind === 'enum'`. */
+  values?: (string | number)[];
+  /** Optional enum member names from `x-enumNames` / `x-enum-varnames`. */
+  enumNames?: string[];
+  /** Present when `kind === 'alias'` — a type alias for a primitive or composition. */
+  aliasType?: string;
 }
 
 export interface SchemaPropertyModel {

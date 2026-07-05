@@ -29,13 +29,13 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 
 ## 0.4.x - Better OpenAPI Support
 
-- Improve enum generation.
-- Improve nullable type handling.
-- Improve object schema generation.
-- Add support for inline schemas.
-- Improve array and record type generation.
-- Improve fallback names for missing `operationId`.
-- Add support for more success response status codes.
+- [x] Improve enum generation.
+- [x] Improve nullable type handling.
+- [x] Improve object schema generation.
+- [x] Add support for inline schemas.
+- [x] Improve array and record type generation.
+- [x] Improve fallback names for missing `operationId`.
+- [x] Add support for more success response status codes.
 
 ## 0.5.x - Fetch Runtime Improvements
 

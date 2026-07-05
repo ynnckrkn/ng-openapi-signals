@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: Inline Schemas Fixture
+  version: 1.0.0
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [Orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customer
+              properties:
+                customer:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                    address:
+                      type: object
+                      properties:
+                        street:
+                          type: string
+                        city:
+                          type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - customer
+                properties:
+                  id:
+                    type: string
+                  customer:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string

@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: Tuples Fixture
+  version: 1.0.0
+paths:
+  /pairs:
+    get:
+      operationId: getPairs
+      tags: [Pairs]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairList"
+components:
+  schemas:
+    PairList:
+      type: object
+      required:
+        - pairs
+      properties:
+        pairs:
+          type: array
+          prefixItems:
+            - type: string
+            - type: integer

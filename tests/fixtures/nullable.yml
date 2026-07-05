@@ -1,0 +1,40 @@
+openapi: 3.0.3
+info:
+  title: Nullable Fixture
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      operationId: getItems
+      tags: [Items]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+components:
+  schemas:
+    Item:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          nullable: true
+          items:
+            type: string
+        ref:
+          nullable: true
+          $ref: "#/components/schemas/Item"
+        typedNull:
+          type:
+            - string
+            - "null"

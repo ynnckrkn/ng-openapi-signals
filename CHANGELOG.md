@@ -7,6 +7,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Enum generation**: Enum schemas in `components/schemas` are now extracted as named union types (`export type UserStatus = 'active' | 'invited' | 'disabled';`) with their own model files and barrel exports, instead of being inlined everywhere.
+- **Nullable handling**: OpenAPI 3.0 `nullable: true` is now supported in addition to OpenAPI 3.1 `type: [x, 'null']`. Nullable properties, arrays, `$ref`s, and primitives correctly produce `T | null`.
+- **Object schema composition**: `allOf` (intersection `A & B`), `oneOf`/`anyOf` (union `A | B`) are now supported in `schemaToTsType`. Composition-only schemas in `components/schemas` become type aliases.
+- **Inline schema hoisting**: Anonymous inline object schemas in properties, request bodies, responses, and parameters are now automatically named (e.g. `UserAddress` from `User.address`) and hoisted to `components/schemas` before generation, producing named model files instead of `Record<string, unknown>`.
+- **Record type generation**: `additionalProperties` with a typed schema now produces `Record<string, T>` instead of `Record<string, unknown>`. `additionalProperties: true` still produces `Record<string, unknown>`.
+- **Tuple support**: OpenAPI 3.1 `prefixItems` produces TypeScript tuple types (`[A, B, C]`).
+- **Fallback `operationId`**: Operations without `operationId` now get camelCase names derived from the HTTP method and path (e.g. `GET /users/{id}` → `getUsersById`, `POST /users` → `createUsers`), using the existing `camelCase`/`pascalCase` helpers from `naming.ts`.
+- **Success response status codes**: All 2xx response codes (including OpenAPI 3.1 `2XX` ranges) are now collected and unioned (`Foo | Bar`). The dangerous fallback to `Object.values(responses)[0]` (which could pick an error response) has been removed. Content-type detection now accepts any JSON-like content type, not just `application/json`.
+- **Fixture-based tests**: Added per-feature OpenAPI fixture specs under `tests/fixtures/` with dedicated test suites for enums, nullable, composition, records, inline schemas, tuples, fallback operationId, and status codes.
+
+### Changed
+
+- `extractSchemas` in `generate-models.ts` now dispatches on schema shape (enum / object / composition / primitive alias) instead of always generating an interface. Enum-only and primitive schemas no longer produce empty interfaces.
+- `collectType` in both `generate-models.ts` and `generate-api.ts` now recognizes `Record<string, X>`, intersection types (`A & B`), tuple types (`[A, B]`), and inline object literals for import collection.
+- `schemaToTsType` now handles `allOf`/`oneOf`/`anyOf`, `additionalProperties` (typed records), `prefixItems` (tuples), and inline object type literals as a fallback when hoisting is not applicable.
+
 ## [0.3.0] - 2026-07-05
 
 ### Changed

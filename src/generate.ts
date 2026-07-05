@@ -6,9 +6,13 @@ import type {GeneratorConfig} from './codegen/types';
 import {extractSchemas, generateModelFiles} from './codegen/generate-models';
 import {extractOperations, generateApiFiles} from './codegen/generate-api';
 import {generateRuntimeFiles} from './codegen/generate-runtime';
+import {hoistInlineSchemas} from './codegen/inline-schemas';
 
 export async function generate(config: GeneratorConfig): Promise<void> {
   const api = await loadOpenApi(config.input);
+
+  // Hoist anonymous inline schemas into components.schemas before extraction.
+  hoistInlineSchemas(api);
 
   if (config.clean) {
     await rm(config.output, {

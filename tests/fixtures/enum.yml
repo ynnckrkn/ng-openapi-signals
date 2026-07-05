@@ -1,0 +1,44 @@
+openapi: 3.0.3
+info:
+  title: Enum Fixture
+  version: 1.0.0
+paths:
+  /status:
+    get:
+      operationId: getStatus
+      tags: [Status]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+components:
+  schemas:
+    UserStatus:
+      type: string
+      enum:
+        - active
+        - invited
+        - disabled
+      x-enumNames:
+        - Active
+        - Invited
+        - Disabled
+    StatusCode:
+      type: integer
+      enum:
+        - 100
+        - 200
+        - 300
+    StatusResponse:
+      type: object
+      required:
+        - status
+        - code
+      properties:
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        code:
+          $ref: "#/components/schemas/StatusCode"

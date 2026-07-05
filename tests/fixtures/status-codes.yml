@@ -1,0 +1,80 @@
+openapi: 3.1.0
+info:
+  title: Status Codes Fixture
+  version: 1.0.0
+paths:
+  /multi:
+    get:
+      operationId: getMulti
+      tags: [Multi]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Foo"
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bar"
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /only201:
+    get:
+      operationId: getOnly201
+      tags: [Multi]
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bar"
+  /nocontent:
+    get:
+      operationId: getNoContent
+      tags: [Multi]
+      responses:
+        "204":
+          description: no content
+  /range:
+    get:
+      operationId: getRange
+      tags: [Multi]
+      responses:
+        "2XX":
+          description: range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Foo"
+components:
+  schemas:
+    Foo:
+      type: object
+      required:
+        - foo
+      properties:
+        foo:
+          type: string
+    Bar:
+      type: object
+      required:
+        - bar
+      properties:
+        bar:
+          type: string
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
