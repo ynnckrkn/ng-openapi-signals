@@ -117,3 +117,38 @@ describe('toApiError', () => {
     expect(error.headers.get('content-type')).toBe('application/json');
   });
 });
+
+describe('custom error mapper contract', () => {
+  // A custom error mapper follows the same shape as toApiError but can return
+  // any Error subclass. This verifies the contract used by the
+  // NG_OPENAPI_SIGNALS_ERROR_MAPPER DI token.
+  it('can return a custom Error subclass', async () => {
+    class ValidationError extends Error {
+      constructor(
+        public status: number,
+        message: string,
+      ) {
+        super(message);
+        this.name = 'ValidationError';
+      }
+    }
+
+    const mapper = async (response: Response): Promise<Error> => {
+      const body = (await response.json()) as {message: string};
+      return new ValidationError(response.status, body.message);
+    };
+
+    const response = createMockResponse({
+      status: 400,
+      statusText: 'Bad Request',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({message: 'Email is required'}),
+    });
+
+    const error = await mapper(response);
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toBe('Email is required');
+    expect((error as ValidationError).status).toBe(400);
+  });
+});

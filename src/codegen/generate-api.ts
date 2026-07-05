@@ -26,6 +26,7 @@ export function extractOperations(api: any): OperationModel[] {
         .map(toParameterModel);
 
       const requestBodyType = extractRequestBodyType(operation);
+      const {responseType, responseParser} = extractResponseType(operation);
 
       operations.push({
         operationId: operation.operationId ?? fallbackOperationId(method, path),
@@ -34,7 +35,8 @@ export function extractOperations(api: any): OperationModel[] {
         path,
         pathParams,
         queryParams,
-        responseType: extractResponseType(operation),
+        responseType,
+        ...(responseParser ? {responseParser} : {}),
         ...(requestBodyType ? {requestBodyType} : {}),
       });
     }
@@ -55,6 +57,7 @@ export function generateApiFiles(
     files[`resources/${kebabCase(group)}.api.ts`] = generateService(
       serviceNameFromTag(group),
       groupOperations,
+      config,
     );
   }
 
@@ -66,12 +69,17 @@ export function generateApiFiles(
   return files;
 }
 
-function generateService(serviceName: string, operations: OperationModel[]): string {
+function generateService(
+  serviceName: string,
+  operations: OperationModel[],
+  config: GeneratorConfig,
+): string {
   const modelImports = collectModelImports(operations);
   const hasGets = operations.some((op) => op.method === 'get');
   const hasGetsWithParams = operations.some(
     (op) => op.method === 'get' && op.pathParams.length + op.queryParams.length > 0,
   );
+  const responseTypeHints = config.runtime?.responseTypeHints ?? true;
 
   const angularImports = ['Service', 'inject'];
   if (hasGets) {
@@ -87,10 +95,10 @@ function generateService(serviceName: string, operations: OperationModel[]): str
   const methods = operations
     .map((operation) => {
       if (operation.method === 'get') {
-        return generateResourceMethod(operation);
+        return generateResourceMethod(operation, responseTypeHints);
       }
 
-      return generateMutationMethod(operation);
+      return generateMutationMethod(operation, responseTypeHints);
     })
     .join('\n\n');
 
@@ -106,7 +114,7 @@ ${methods}
 `;
 }
 
-function generateResourceMethod(operation: OperationModel): string {
+function generateResourceMethod(operation: OperationModel, responseTypeHints: boolean): string {
   const hasParams = operation.pathParams.length + operation.queryParams.length > 0;
   const paramsType = generateParamsType(operation);
   const resourceParamsType = generateResolvedParamsType(operation);
@@ -125,6 +133,10 @@ function generateResourceMethod(operation: OperationModel): string {
 
   if (queryExpression) {
     requestLines.push(`query: ${queryExpression},`);
+  }
+
+  if (responseTypeHints && operation.responseParser) {
+    requestLines.push(`responseType: '${operation.responseParser}',`);
   }
 
   requestLines.push('signal: abortSignal');
@@ -160,7 +172,7 @@ ${properties}
   }`;
 }
 
-function generateMutationMethod(operation: OperationModel): string {
+function generateMutationMethod(operation: OperationModel, responseTypeHints: boolean): string {
   const hasParams = operation.pathParams.length + operation.queryParams.length > 0;
   const paramsType = generateParamsType(operation);
   const bodyParameter = operation.requestBodyType ? `body: ${operation.requestBodyType}, ` : '';
@@ -179,6 +191,10 @@ function generateMutationMethod(operation: OperationModel): string {
 
   if (operation.requestBodyType) {
     requestLines.push('body,');
+  }
+
+  if (responseTypeHints && operation.responseParser) {
+    requestLines.push(`responseType: '${operation.responseParser}',`);
   }
 
   requestLines.push('signal');
@@ -264,18 +280,22 @@ function toParameterModel(parameter: any): ParameterModel {
   };
 }
 
-function extractResponseType(operation: any): string {
+function extractResponseType(operation: any): {
+  responseType: string;
+  responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer';
+} {
   const responses = operation.responses ?? {};
 
   // Collect all 2xx response schemas (including 2XX range from OpenAPI 3.1).
   const successSchemas: string[] = [];
+  let responseParser: 'json' | 'text' | 'blob' | 'arrayBuffer' | undefined;
 
   for (const [statusCode, response] of Object.entries(responses)) {
     if (!isSuccessStatus(statusCode)) {
       continue;
     }
 
-    const schema = extractSchemaFromResponse(response);
+    const {schema, contentType} = extractSchemaFromResponse(response);
 
     // 204 / no content → void; skip adding to the union.
     if (!schema || schema === 'void') {
@@ -283,20 +303,52 @@ function extractResponseType(operation: any): string {
     }
 
     successSchemas.push(schema);
+
+    // Use the first success response's content type to derive the parser hint.
+    if (!responseParser && contentType) {
+      responseParser = parserForContentType(contentType);
+    }
   }
 
   if (successSchemas.length === 0) {
-    return 'void';
+    return {responseType: 'void'};
   }
 
   // Deduplicate while preserving order.
   const unique = Array.from(new Set(successSchemas));
 
-  if (unique.length === 1) {
-    return unique[0]!;
+  const responseType = unique.length === 1 ? unique[0]! : unique.join(' | ');
+
+  return {
+    responseType,
+    ...(responseParser ? {responseParser} : {}),
+  };
+}
+
+/** Maps an HTTP content-type to a runtime response parser hint. */
+function parserForContentType(
+  contentType: string,
+): 'json' | 'text' | 'blob' | 'arrayBuffer' | undefined {
+  if (contentType.includes('application/json') || contentType.includes('+json')) {
+    return 'json';
   }
 
-  return unique.join(' | ');
+  if (contentType.startsWith('text/')) {
+    return 'text';
+  }
+
+  // Binary content types → Blob by default.
+  if (
+    contentType.startsWith('image/') ||
+    contentType.startsWith('audio/') ||
+    contentType.startsWith('video/') ||
+    contentType === 'application/octet-stream' ||
+    contentType.startsWith('multipart/')
+  ) {
+    return 'blob';
+  }
+
+  return undefined;
 }
 
 function isSuccessStatus(statusCode: string): boolean {
@@ -317,31 +369,37 @@ function isSuccessStatus(statusCode: string): boolean {
   return false;
 }
 
-function extractSchemaFromResponse(response: any): string | undefined {
+function extractSchemaFromResponse(response: any): {
+  schema?: string;
+  contentType?: string;
+} {
   if (!response?.content) {
-    return undefined;
+    return {};
   }
 
-  // Try common JSON content types, then */*.
-  const jsonContent =
-    response.content['application/json'] ??
-    Object.values(response.content).find((c: any) => isJsonContentType(c)) as any | undefined;
+  // Prefer application/json, then any JSON-like content type, then */*.
+  const entries = Object.entries(response.content) as [string, any][];
 
-  const content = jsonContent ?? response.content['*/*'];
+  const jsonEntry = entries.find(([type]) => type === 'application/json');
+  const jsonLikeEntry = entries.find(
+    ([type, c]) => type !== 'application/json' && type !== '*/*' && c?.schema,
+  );
+  const wildcardEntry = entries.find(([type]) => type === '*/*');
 
+  const chosen = jsonEntry ?? jsonLikeEntry ?? wildcardEntry;
+
+  if (!chosen) {
+    return {};
+  }
+
+  const [contentType, content] = chosen;
   const schema = content?.schema;
 
   if (!schema) {
-    return undefined;
+    return {contentType};
   }
 
-  return schemaToTsType(schema);
-}
-
-function isJsonContentType(content: any): boolean {
-  // Heuristic: any content type that looks like JSON (application/json, application/vnd.foo+json).
-  // The content object itself doesn't carry the mime type, so this is a fallback.
-  return Boolean(content?.schema);
+  return {schema: schemaToTsType(schema), contentType};
 }
 
 function extractRequestBodyType(operation: any): string | undefined {
@@ -453,6 +511,13 @@ function collectType(type: string, output: Set<string>): void {
     'unknown',
     'null',
     'Record<string, unknown>',
+    // Browser built-in types — never imported from generated models.
+    'Blob',
+    'ArrayBuffer',
+    'File',
+    'FormData',
+    'ReadableStream',
+    'URLSearchParams',
   ]);
 
   if (primitives.has(type)) {

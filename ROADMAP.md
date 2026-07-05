@@ -4,28 +4,28 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 
 ## 0.1.x - MVP Stabilization
 
-- Improve generated method signatures.
-- Remove unnecessary `params: void` arguments.
-- Add tests for the example OpenAPI specification.
-- Improve TypeScript strict-mode compatibility.
-- Improve generated imports.
-- Add basic error handling tests.
-- Add GitHub Actions for build and test checks.
+- [x] Improve generated method signatures.
+- [x] Remove unnecessary `params: void` arguments.
+- [x] Add tests for the example OpenAPI specification.
+- [x] Improve TypeScript strict-mode compatibility.
+- [x] Improve generated imports.
+- [x] Add basic error handling tests.
+- [x] Add GitHub Actions for build and test checks.
 
 ## 0.2.x - Configuration
 
-- Add config file support.
-- Support `ng-openapi-signals.config.ts`.
-- Add options for input and output paths.
-- Add option to clean or preserve the output directory.
-- Add option to customize the API base URL token name.
-- Add option to group generated APIs by tags or paths.
+- [x] Add config file support.
+- [x] Support `ng-openapi-signals.config.ts`.
+- [x] Add options for input and output paths.
+- [x] Add option to clean or preserve the output directory.
+- [x] Add option to customize the API base URL token name.
+- [x] Add option to group generated APIs by tags or paths.
 
 ## 0.3.0 - Provider-based Base URL Configuration
 
-- Introduce the generated `provideNgOpenapiSignals({ basePath })` helper as the default way to configure the API base URL.
-- Replace the old `API_BASE_URL` token-based setup in generated clients and examples.
-- Document the migration path for existing consumers.
+- [x] Introduce the generated `provideNgOpenapiSignals({ basePath })` helper as the default way to configure the API base URL.
+- [x] Replace the old `API_BASE_URL` token-based setup in generated clients and examples.
+- [x] Document the migration path for existing consumers.
 
 ## 0.4.x - Better OpenAPI Support
 
@@ -39,13 +39,13 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 
 ## 0.5.x - Fetch Runtime Improvements
 
-- Add fetch middleware support.
-- Add auth header hooks.
-- Add custom default headers.
-- Add custom error mapping.
-- Add request and response hooks.
-- Add better handling for non-JSON responses.
-- Add support for `Blob`, `ArrayBuffer` and plain text responses.
+- [x] Add fetch middleware support.
+- [x] Add auth header hooks.
+- [x] Add custom default headers.
+- [x] Add custom error mapping.
+- [x] Add request and response hooks.
+- [x] Add better handling for non-JSON responses.
+- [x] Add support for `Blob`, `ArrayBuffer` and plain text responses.
 
 ## 0.6.x - Advanced Request Support
 

@@ -208,6 +208,39 @@ paths:
                 details:
                   id: usr_999
 
+  /users/{id}/avatar:
+    get:
+      operationId: getUserAvatar
+      tags:
+        - Users
+      summary: Get a user's avatar image
+      description: Returns the user's avatar as a PNG image.
+
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique user ID.
+          schema:
+            type: string
+          example: usr_123
+
+      responses:
+        "200":
+          description: Avatar image.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+
+        "404":
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     User:

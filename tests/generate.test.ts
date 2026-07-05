@@ -81,7 +81,7 @@ describe('generate', () => {
     expect(providersContent).toContain('basePath');
 
     const clientContent = await readFile(join(OUTPUT_DIR, 'api-fetch-client.ts'), 'utf8');
-    expect(clientContent).toContain("import { NG_OPENAPI_SIGNALS_BASE_PATH } from './providers'");
+    expect(clientContent).toContain('NG_OPENAPI_SIGNALS_BASE_PATH');
     expect(clientContent).toContain('inject(NG_OPENAPI_SIGNALS_BASE_PATH)');
   });
 

@@ -2,14 +2,42 @@ export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 export type GroupBy = 'tag' | 'path';
 
+/**
+ * Runtime-related generator options.
+ *
+ * These influence the generated runtime files (providers, fetch client).
+ * Runtime extension points that are functions (middleware, auth, hooks,
+ * error mapper) are configured at runtime via Angular DI tokens emitted by
+ * `provideNgOpenapiSignals`. Only static, codegen-time defaults live here.
+ */
+export interface RuntimeConfig {
+  /**
+   * Static default headers merged into every request. These are baked into
+   * the generated `provideNgOpenapiSignals` default and can be overridden
+   * per request via `ApiRequestOptions.headers`.
+   */
+  defaultHeaders?: Record<string, string>;
+  /**
+   * When `true` (default), generated API methods emit a `responseType`
+   * hint (`'json' | 'text' | 'blob' | 'arrayBuffer'`) derived from the
+   * OpenAPI response `content` type. Set to `false` to rely solely on
+   * runtime content-type sniffing.
+   */
+  responseTypeHints?: boolean;
+}
+
 export interface GeneratorConfig {
   input: string;
   output: string;
   clean: boolean;
   groupBy: GroupBy;
+  /** Runtime options. Omitted in partial configs; defaulted by `resolveConfig`. */
+  runtime?: RuntimeConfig;
 }
 
-export type PartialGeneratorConfig = Partial<GeneratorConfig>;
+export type PartialGeneratorConfig = Partial<Omit<GeneratorConfig, 'runtime'>> & {
+  runtime?: Partial<RuntimeConfig>;
+};
 
 export interface GenerateOptions {
   input: string;
@@ -31,6 +59,8 @@ export interface OperationModel {
   pathParams: ParameterModel[];
   queryParams: ParameterModel[];
   responseType: string;
+  /** Parser hint derived from the success response content type. */
+  responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer';
   requestBodyType?: string;
 }
 

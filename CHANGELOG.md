@@ -7,6 +7,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-05
+
+### Added
+
+- **Fetch middleware**: Onion-style middleware functions `(request, next) => Promise<Response>` can be registered via `provideNgOpenapiSignals({ middleware })`. Middleware can mutate requests, short-circuit, transform responses, or handle errors. Configured through the `NG_OPENAPI_SIGNALS_MIDDLEWARE` DI token.
+- **Auth header hooks**: An optional `auth` hook (`() => Record<string, string> | Promise<...>`) merges auth headers into every request. Configured through the `NG_OPENAPI_SIGNALS_AUTH` DI token.
+- **Custom default headers**: Static default headers can be set via `runtime.defaultHeaders` in the config file (baked into the `provideNgOpenapiSignals` defaults) and/or overridden at runtime via `provideNgOpenapiSignals({ defaultHeaders })`. Configured through the `NG_OPENAPI_SIGNALS_DEFAULT_HEADERS` DI token.
+- **Custom error mapping**: A custom error mapper can replace the default `toApiError` via `provideNgOpenapiSignals({ errorMapper })`. Configured through the `NG_OPENAPI_SIGNALS_ERROR_MAPPER` DI token.
+- **Request and response hooks**: `onRequest` and `onResponse` hooks allow pre/post-fetch interception. Configured through the `NG_OPENAPI_SIGNALS_REQUEST_HOOK` and `NG_OPENAPI_SIGNALS_RESPONSE_HOOK` DI tokens.
+- **Non-JSON response parsing**: The generated `ApiFetchClient` now parses responses based on a spec-driven `responseType` hint (`'json' | 'text' | 'blob' | 'arrayBuffer'`) derived from the OpenAPI response `content` type, with content-type sniffing as a fallback.
+- **`Blob`, `ArrayBuffer` and plain text responses**: OpenAPI `format: binary` schemas now map to `Blob`. Text content types map to `string`. Binary content types map to `Blob`. The runtime supports `responseType: 'arrayBuffer'` for explicit ArrayBuffer parsing.
+- **`runtime` config section**: New `RuntimeConfig` (`defaultHeaders`, `responseTypeHints`) added to `GeneratorConfig` with deep-merge in `resolveConfig` and validation in `validateConfig`.
+- **Fixture-based tests**: Added `tests/fixtures/response-types.yml` with a dedicated test suite for response type hints (json, text, blob, 204).
+
+### Changed
+
+- The generated `ApiFetchClient.request<T>` method has been refactored from a monolithic implementation into a middleware pipeline. Without middleware/hooks configured, behavior is backwards-compatible with 0.4.x.
+- `extractResponseType` in `generate-api.ts` now returns both the TypeScript type and a `responseParser` hint derived from the success response content type.
+- `extractSchemaFromResponse` in `generate-api.ts` now returns the content type alongside the schema.
+- `schemaToTsType` now maps `format: binary` to `Blob` instead of `string`.
+- Generated API methods now emit a `responseType` field in `ApiRequestOptions` when `runtime.responseTypeHints` is `true` (default).
+- The generated `providers.ts` now defines six new DI tokens and the `provideNgOpenapiSignals` signature accepts the new optional options.
+
+### Backwards Compatibility
+
+- Without any new configuration, the generated runtime behaves identically to 0.4.x: no middleware, no auth hook, empty default headers, `toApiError` as the error mapper, and content-type sniffing for response parsing.
+- Existing tests continue to pass without modification (except one assertion in `generate.test.ts` updated for the new multi-line import in `api-fetch-client.ts`).
+
+## [0.4.0] - 2026-07-05
+
 ### Added
 
 - **Enum generation**: Enum schemas in `components/schemas` are now extracted as named union types (`export type UserStatus = 'active' | 'invited' | 'disabled';`) with their own model files and barrel exports, instead of being inlined everywhere.

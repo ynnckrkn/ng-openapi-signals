@@ -8,6 +8,7 @@ import {
   defineConfig,
   isGroupBy,
   DEFAULT_CONFIG,
+  DEFAULT_RUNTIME_CONFIG,
 } from '../src/config.js';
 
 const TMP_DIR = join(process.cwd(), 'tests', '.tmp-config');
@@ -76,6 +77,67 @@ describe('config', () => {
       const config = resolveConfig({groupBy: 'path'}, {groupBy: 'tag'});
       expect(config.groupBy).toBe('path');
     });
+
+    it('provides default runtime config when no overrides given', () => {
+      const config = resolveConfig({}, {});
+      expect(config.runtime).toEqual(DEFAULT_RUNTIME_CONFIG);
+      expect(config.runtime.defaultHeaders).toEqual({});
+      expect(config.runtime.responseTypeHints).toBe(true);
+    });
+
+    it('file runtime.defaultHeaders overrides defaults', () => {
+      const config = resolveConfig({}, {
+        runtime: {defaultHeaders: {'X-Client': 'ng-openapi-signals'}},
+      });
+      expect(config.runtime.defaultHeaders).toEqual({'X-Client': 'ng-openapi-signals'});
+    });
+
+    it('CLI runtime.defaultHeaders merges over file runtime.defaultHeaders', () => {
+      const config = resolveConfig(
+        {runtime: {defaultHeaders: {'X-Cli': 'cli'}}},
+        {runtime: {defaultHeaders: {'X-File': 'file'}}},
+      );
+      // Deep-merge: CLI keys win, file keys preserved when not overridden.
+      expect(config.runtime.defaultHeaders).toEqual({'X-Cli': 'cli', 'X-File': 'file'});
+    });
+
+    it('CLI runtime.defaultHeaders overrides file keys with the same name', () => {
+      const config = resolveConfig(
+        {runtime: {defaultHeaders: {'X-Shared': 'cli'}}},
+        {runtime: {defaultHeaders: {'X-Shared': 'file'}}},
+      );
+      expect(config.runtime.defaultHeaders).toEqual({'X-Shared': 'cli'});
+    });
+
+    it('deep-merges runtime.defaultHeaders from file and defaults', () => {
+      const config = resolveConfig({}, {
+        runtime: {defaultHeaders: {'X-Custom': 'abc'}},
+      });
+      // default is {} so result equals file override
+      expect(config.runtime.defaultHeaders).toEqual({'X-Custom': 'abc'});
+    });
+
+    it('file responseTypeHints=false overrides default true', () => {
+      const config = resolveConfig({}, {runtime: {responseTypeHints: false}});
+      expect(config.runtime.responseTypeHints).toBe(false);
+    });
+
+    it('CLI responseTypeHints overrides file', () => {
+      const config = resolveConfig(
+        {runtime: {responseTypeHints: true}},
+        {runtime: {responseTypeHints: false}},
+      );
+      expect(config.runtime.responseTypeHints).toBe(true);
+    });
+
+    it('preserves unrelated runtime fields when partially overridden', () => {
+      const config = resolveConfig(
+        {runtime: {responseTypeHints: false}},
+        {runtime: {defaultHeaders: {'X-A': 'a'}}},
+      );
+      expect(config.runtime.responseTypeHints).toBe(false);
+      expect(config.runtime.defaultHeaders).toEqual({'X-A': 'a'});
+    });
   });
 
   describe('validateConfig', () => {
@@ -94,6 +156,50 @@ describe('config', () => {
     it('does not throw when input and output are set', () => {
       expect(() =>
         validateConfig({...DEFAULT_CONFIG, input: './openapi.json', output: './out'}),
+      ).not.toThrow();
+    });
+
+    it('throws when runtime.defaultHeaders is not an object', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {defaultHeaders: 'not-an-object' as unknown as Record<string, string>},
+        }),
+      ).toThrow('Invalid runtime.defaultHeaders');
+    });
+
+    it('throws when runtime.defaultHeaders has a non-string value', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {defaultHeaders: {'X-Num': 123 as unknown as string}},
+        }),
+      ).toThrow("must be a string, got number");
+    });
+
+    it('throws when runtime.responseTypeHints is not a boolean', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {responseTypeHints: 'yes' as unknown as boolean},
+        }),
+      ).toThrow('Invalid runtime.responseTypeHints');
+    });
+
+    it('does not throw for valid runtime config', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {defaultHeaders: {'X-Client': 'abc'}, responseTypeHints: false},
+        }),
       ).not.toThrow();
     });
   });

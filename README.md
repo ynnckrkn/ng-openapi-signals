@@ -15,8 +15,12 @@ GET endpoints are generated as Angular `resource()` APIs, while mutating endpoin
 - Path parameter support
 - Query parameter support
 - JSON request body support
-- JSON response handling
-- Basic API error handling
+- JSON, text, `Blob` and `ArrayBuffer` response handling
+- Fetch middleware (onion-style `(request, next) => response`)
+- Auth header hooks
+- Custom default headers
+- Custom error mapping
+- Request and response hooks
 - Base URL configuration via `provideNgOpenapiSignals()`
 
 ## Requirements
@@ -168,6 +172,59 @@ export const appConfig: ApplicationConfig = {
 };
 ```
 
+## Runtime Configuration
+
+`provideNgOpenapiSignals()` accepts optional runtime extension points. All are
+optional — without them the client behaves as a plain `fetch()` wrapper.
+
+```ts
+provideNgOpenapiSignals({
+  basePath: 'https://api.example.com',
+
+  // Static default headers merged into every request.
+  defaultHeaders: { 'X-Client': 'my-app' },
+
+  // Called once per request to add auth headers (e.g. a bearer token).
+  auth: () => ({ Authorization: `Bearer ${token()}` }),
+
+  // Onion-style middleware: (request, next) => Promise<Response>.
+  middleware: [
+    async (req, next) => {
+      console.log('→', req.init.method, req.url);
+      const res = await next();
+      console.log('←', res.status);
+      return res;
+    },
+  ],
+
+  // Called before the middleware pipeline runs. Can mutate the request.
+  onRequest: (ctx) => {
+    ctx.init.headers = { ...ctx.init.headers, 'X-Trace-Id': crypto.randomUUID() };
+  },
+
+  // Called after a successful response is received.
+  onResponse: (res) => console.log('response', res.status),
+
+  // Replaces the default `toApiError` error mapper.
+  errorMapper: async (res) => new MyApiError(await res.json()),
+});
+```
+
+### Response parsing
+
+Generated methods emit a `responseType` hint derived from the OpenAPI response
+`content` type, so the runtime picks the right parser:
+
+| OpenAPI content type                       | `responseType` | TypeScript return type |
+| ------------------------------------------ | -------------- | ---------------------- |
+| `application/json` (and `*+json`)          | `'json'`       | inferred from schema   |
+| `text/*`                                   | `'text'`       | `string`               |
+| `image/*`, `audio/*`, `video/*`, `octet-stream`, `multipart/*` | `'blob'`       | `Blob`                 |
+
+For responses without a known content type the runtime falls back to
+content-type sniffing. Set `runtime.responseTypeHints: false` in the config
+file to disable hints and rely solely on runtime sniffing.
+
 ## Usage
 
 Assume your OpenAPI specification contains this endpoint:
@@ -279,14 +336,17 @@ The generated `ApiFetchClient` wraps native `fetch()` and handles:
 
 - Base URL handling
 - JSON request bodies
-- JSON responses
+- JSON, text, `Blob` and `ArrayBuffer` responses (spec-driven with content-type fallback)
 - Query parameters
 - Abort signals
-- Basic error handling
+- Default headers (static via config + runtime via `auth` hook)
+- Onion-style fetch middleware
+- Request and response hooks
+- Custom error mapping
 
 ### `provideNgOpenapiSignals()`
 
-The generated helper configures the base URL of your backend API.
+The generated helper configures the runtime. See [Runtime Configuration](#runtime-configuration) for the full options.
 
 ```ts
 import {provideNgOpenapiSignals} from './generated/api';
@@ -347,6 +407,14 @@ export default defineConfig({
 | `output`          | `string`          | —                | Output directory for the generated Angular client       |
 | `clean`           | `boolean`         | `true`           | Clean output directory before generation                |
 | `groupBy`         | `'tag' \| 'path'` | `'tag'`          | Group generated APIs by OpenAPI tag or URL path segment |
+| `runtime`         | `RuntimeConfig`   | `{}`             | Runtime options (see below)                             |
+
+#### `runtime`
+
+| Option              | Type                        | Default | Description                                                              |
+| ------------------- | --------------------------- | ------- | ------------------------------------------------------------------------ |
+| `defaultHeaders`    | `Record<string, string>`    | `{}`    | Static default headers baked into `provideNgOpenapiSignals` defaults     |
+| `responseTypeHints` | `boolean`                   | `true`  | Emit `responseType` hints in generated methods based on response content |
 
 ### CLI overrides
 

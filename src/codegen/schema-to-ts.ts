@@ -63,6 +63,9 @@ export function schemaToTsType(schema: any): string {
       return withNullable('boolean', schema);
 
     case 'string':
+      if (schema.format === 'binary') {
+        return withNullable('Blob', schema);
+      }
       return withNullable('string', schema);
 
     case 'object':

@@ -1,0 +1,49 @@
+openapi: 3.0.3
+info:
+  title: Response Types Fixture
+  version: 1.0.0
+paths:
+  /text:
+    get:
+      operationId: getText
+      tags: [Content]
+      responses:
+        "200":
+          description: A plain text document.
+          content:
+            text/plain:
+              schema:
+                type: string
+  /avatar:
+    get:
+      operationId: getAvatar
+      tags: [Content]
+      responses:
+        "200":
+          description: A PNG image.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+  /json:
+    get:
+      operationId: getJson
+      tags: [Content]
+      responses:
+        "200":
+          description: A JSON object.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /no-content:
+    delete:
+      operationId: deleteNoContent
+      tags: [Content]
+      responses:
+        "204":
+          description: No content.

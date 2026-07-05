@@ -2,26 +2,44 @@ import {mkdir, rm, writeFile} from 'node:fs/promises';
 import {dirname, join} from 'node:path';
 import {format} from 'prettier';
 import {loadOpenApi} from './openapi';
-import type {GeneratorConfig} from './codegen/types';
+import type {GeneratorConfig, RuntimeConfig} from './codegen/types';
 import {extractSchemas, generateModelFiles} from './codegen/generate-models';
 import {extractOperations, generateApiFiles} from './codegen/generate-api';
 import {generateRuntimeFiles} from './codegen/generate-runtime';
 import {hoistInlineSchemas} from './codegen/inline-schemas';
 
+const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
+  defaultHeaders: {},
+  responseTypeHints: true,
+};
+
+/** Ensures `config.runtime` is present, defaulting missing fields. */
+function withRuntimeDefaults(config: GeneratorConfig): GeneratorConfig {
+  const runtime = config.runtime ?? DEFAULT_RUNTIME_CONFIG;
+  return {
+    ...config,
+    runtime: {
+      defaultHeaders: runtime.defaultHeaders ?? {},
+      responseTypeHints: runtime.responseTypeHints ?? true,
+    },
+  };
+}
+
 export async function generate(config: GeneratorConfig): Promise<void> {
-  const api = await loadOpenApi(config.input);
+  const normalizedConfig = withRuntimeDefaults(config);
+  const api = await loadOpenApi(normalizedConfig.input);
 
   // Hoist anonymous inline schemas into components.schemas before extraction.
   hoistInlineSchemas(api);
 
-  if (config.clean) {
-    await rm(config.output, {
+  if (normalizedConfig.clean) {
+    await rm(normalizedConfig.output, {
       recursive: true,
       force: true,
     });
   }
 
-  await mkdir(config.output, {
+  await mkdir(normalizedConfig.output, {
     recursive: true,
   });
 
@@ -29,14 +47,14 @@ export async function generate(config: GeneratorConfig): Promise<void> {
   const operations = extractOperations(api);
 
   const files: Record<string, string> = {
-    ...generateRuntimeFiles(config),
+    ...generateRuntimeFiles(normalizedConfig),
     ...generateModelFiles(schemas),
-    ...generateApiFiles(operations, config),
+    ...generateApiFiles(operations, normalizedConfig),
     'index.ts': generateIndexFile(),
   };
 
   for (const [fileName, content] of Object.entries(files)) {
-    const outputPath = join(config.output, fileName);
+    const outputPath = join(normalizedConfig.output, fileName);
     const formatted = await format(withHeader(content), {
       parser: 'typescript',
       singleQuote: true,
