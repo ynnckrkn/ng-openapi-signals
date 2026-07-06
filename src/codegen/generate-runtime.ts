@@ -516,19 +516,49 @@ export class ApiHttpClient {
     const responseType = this.mapResponseType(options.responseType);
 
     try {
-      const response = await firstValueFrom(
-        this.http.request<unknown>(
-          context.method,
-          context.url,
-          {
+      let response: HttpResponse<unknown>;
+
+      if (responseType === 'arraybuffer') {
+        response = await firstValueFrom(
+          this.http.request(context.method, context.url, {
             headers: context.headers,
             ...(context.body !== undefined ? { body: context.body } : {}),
             observe: 'response',
-            ...(responseType ? { responseType: responseType as 'json' | 'text' | 'blob' | 'arraybuffer' } : {}),
-            ...(options.signal ? { signal: options.signal } : {})
-          },
-        ),
-      ) as HttpResponse<unknown>;
+            responseType: 'arraybuffer',
+            ...(options.signal ? { signal: options.signal } : {}),
+          }),
+        );
+      } else if (responseType === 'blob') {
+        response = await firstValueFrom(
+          this.http.request(context.method, context.url, {
+            headers: context.headers,
+            ...(context.body !== undefined ? { body: context.body } : {}),
+            observe: 'response',
+            responseType: 'blob',
+            ...(options.signal ? { signal: options.signal } : {}),
+          }),
+        );
+      } else if (responseType === 'text') {
+        response = await firstValueFrom(
+          this.http.request(context.method, context.url, {
+            headers: context.headers,
+            ...(context.body !== undefined ? { body: context.body } : {}),
+            observe: 'response',
+            responseType: 'text',
+            ...(options.signal ? { signal: options.signal } : {}),
+          }),
+        );
+      } else {
+        response = await firstValueFrom(
+          this.http.request<unknown>(context.method, context.url, {
+            headers: context.headers,
+            ...(context.body !== undefined ? { body: context.body } : {}),
+            observe: 'response',
+            responseType: 'json',
+            ...(options.signal ? { signal: options.signal } : {}),
+          }),
+        );
+      }
 
       if (this.onResponse) {
         await this.onResponse(response);
@@ -603,9 +633,7 @@ function objectLiteral(value: Record<string, string>): string {
   }
   return (
     '{ ' +
-    entries
-      .map(([key, val]) => `${JSON.stringify(key)}: ${JSON.stringify(val)}`)
-      .join(', ') +
+    entries.map(([key, val]) => `${JSON.stringify(key)}: ${JSON.stringify(val)}`).join(', ') +
     ' }'
   );
 }

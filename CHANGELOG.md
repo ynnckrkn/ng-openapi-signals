@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-06
+
+### Fixed
+
+- **`ApiHttpClient` type safety**: The `HttpClient.request` call in the generated httpClient transport now uses separate branches for each `responseType` (`'json'`, `'text'`, `'blob'`, `'arraybuffer'`) instead of a single call with a union type or `as any` cast. This resolves TypeScript overload errors caused by Angular's per-`responseType` overloads and preserves full type safety.
+
 ## [0.6.0] - 2026-07-06
 
 ### Added
