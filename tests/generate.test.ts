@@ -112,4 +112,31 @@ describe('generate', () => {
     const content = await readFile(join(OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');
     expect(content).toContain('export class UsersApi');
   });
+
+  it('generates httpClient runtime files when transport is httpClient', async () => {
+    await generate({
+      input: 'examples/openapi.json',
+      output: OUTPUT_DIR,
+      clean: true,
+      groupBy: 'tag',
+      runtime: {transport: 'httpClient'},
+    });
+
+    // api-http-client.ts exists, api-fetch-client.ts does not
+    await expect(access(join(OUTPUT_DIR, 'api-http-client.ts'))).resolves.toBeUndefined();
+    await expect(access(join(OUTPUT_DIR, 'api-fetch-client.ts'))).rejects.toBeDefined();
+
+    const indexContent = await readFile(join(OUTPUT_DIR, 'index.ts'), 'utf8');
+    expect(indexContent).toContain("export * from './api-http-client';");
+    expect(indexContent).not.toContain("export * from './api-fetch-client';");
+
+    const providersContent = await readFile(join(OUTPUT_DIR, 'providers.ts'), 'utf8');
+    expect(providersContent).toContain('provideHttpClient');
+    expect(providersContent).not.toContain('NG_OPENAPI_SIGNALS_MIDDLEWARE');
+
+    const apiContent = await readFile(join(OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');
+    expect(apiContent).toContain('ApiHttpClient');
+    expect(apiContent).toContain("from '../api-http-client'");
+    expect(apiContent).not.toContain('ApiFetchClient');
+  });
 });

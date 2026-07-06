@@ -1,0 +1,491 @@
+import {describe, it, expect, vi, afterEach} from 'vitest';
+
+// Tests mirror the generated api-http-client.ts template logic without Angular DI.
+// Dependencies that would be injected are passed explicitly to `createClient`.
+// Angular's HttpClient, HttpResponse, HttpErrorResponse, and rxjs Observables
+// are stubbed locally to avoid adding @angular/common and rxjs as test deps.
+
+interface HttpHeadersStub {
+  get(name: string): string | null;
+}
+
+interface HttpResponseStub<T> {
+  status: number;
+  body: T;
+}
+
+interface HttpErrorResponseStub {
+  status: number;
+  statusText: string;
+  error: unknown;
+  headers: HttpHeadersStub;
+}
+
+/** Simple Observable-like stub that mimics firstValueFrom via toPromise(). */
+class ObservableStub<T> {
+  constructor(
+    private readonly value: T | unknown,
+    private readonly shouldReject = false,
+  ) {}
+
+  toPromise(): Promise<T> {
+    if (this.shouldReject) {
+      return Promise.reject(this.value);
+    }
+    return Promise.resolve(this.value as T);
+  }
+}
+
+function of<T>(value: T): ObservableStub<T> {
+  return new ObservableStub(value);
+}
+
+function throwError(error: unknown): ObservableStub<never> {
+  return new ObservableStub(error, true) as ObservableStub<never>;
+}
+
+function httpResponse<T>(body: T, status: number): HttpResponseStub<T> {
+  return {status, body};
+}
+
+function httpError(
+  status: number,
+  statusText: string,
+  error: unknown,
+): HttpErrorResponseStub {
+  return {
+    status,
+    statusText,
+    error,
+    headers: {get: () => null},
+  };
+}
+
+interface ApiRequestOptions {
+  method: string;
+  path: string;
+  query?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  body?: unknown;
+  signal?: AbortSignal;
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer';
+}
+
+interface ApiRequestContext {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: unknown;
+}
+
+type ApiAuthHook = () => Record<string, string> | Promise<Record<string, string>>;
+type ApiErrorMapper = (error: HttpErrorResponseStub) => Promise<ApiError | Error> | ApiError | Error;
+type ApiRequestHook = (request: ApiRequestContext) => void | Promise<void>;
+type ApiResponseHook = (response: HttpResponseStub<unknown>) => void | Promise<void>;
+
+interface ApiError {
+  status: number;
+  statusText: string;
+  body: unknown;
+  headers: HttpHeadersStub;
+}
+
+interface ClientDeps {
+  baseUrl: string;
+  auth?: ApiAuthHook;
+  defaultHeaders?: Record<string, string>;
+  errorMapper?: ApiErrorMapper;
+  onRequest?: ApiRequestHook;
+  onResponse?: ApiResponseHook;
+  http: {request: (...args: any[]) => any};
+}
+
+function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown>): string {
+  const url = new URL(path, baseUrl);
+
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        url.searchParams.append(key, String(item));
+      }
+    } else {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  return url.toString();
+}
+
+function mapResponseType(
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer',
+): 'json' | 'text' | 'blob' | 'arraybuffer' | undefined {
+  if (!responseType) {
+    return undefined;
+  }
+  switch (responseType) {
+    case 'arrayBuffer':
+      return 'arraybuffer';
+    default:
+      return responseType;
+  }
+}
+
+function toApiErrorFromHttpErrorResponse(error: HttpErrorResponseStub): ApiError {
+  return {
+    status: error.status,
+    statusText: error.statusText,
+    body: error.error,
+    headers: error.headers,
+  };
+}
+
+function createClient(deps: ClientDeps) {
+  const defaultHeaders = deps.defaultHeaders ?? {};
+  const errorMapper = deps.errorMapper ?? toApiErrorFromHttpErrorResponse;
+
+  async function request<T>(options: ApiRequestOptions): Promise<T> {
+    const url = buildUrl(deps.baseUrl, options.path, options.query);
+
+    const authHeaders = deps.auth ? await deps.auth() : {};
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      ...defaultHeaders,
+      ...authHeaders,
+      ...(options.body !== undefined ? {'Content-Type': 'application/json'} : {}),
+      ...options.headers,
+    };
+
+    const context: ApiRequestContext = {
+      url,
+      method: options.method,
+      headers,
+      body: options.body,
+    };
+
+    if (deps.onRequest) {
+      await deps.onRequest(context);
+    }
+
+    const responseType = mapResponseType(options.responseType);
+
+    try {
+      const response = (await deps.http
+        .request(context.method, context.url, {
+          headers: context.headers,
+          ...(context.body !== undefined ? {body: context.body} : {}),
+          observe: 'response',
+          ...(responseType ? {responseType: responseType as 'json' | 'text' | 'blob' | 'arraybuffer'} : {}),
+          ...(options.signal ? {signal: options.signal} : {}),
+        })
+        .toPromise()) as HttpResponseStub<unknown>;
+
+      if (deps.onResponse) {
+        await deps.onResponse(response);
+      }
+
+      if (response.status === 204) {
+        return undefined as unknown as T;
+      }
+
+      return response.body as T;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'status' in error && 'statusText' in error) {
+        throw await errorMapper(error as HttpErrorResponseStub);
+      }
+      throw error;
+    }
+  }
+
+  return {request};
+}
+
+/** Creates a mock HttpClient whose request() returns an Observable. */
+function mockHttp(response: HttpResponseStub<unknown>) {
+  return {
+    request: vi.fn().mockReturnValue(of(response)),
+  };
+}
+
+/** Creates a mock HttpClient whose request() returns an error Observable. */
+function mockHttpError(error: HttpErrorResponseStub) {
+  return {
+    request: vi.fn().mockReturnValue(throwError(error)),
+  };
+}
+
+describe('ApiHttpClient request logic', () => {
+  const baseUrl = 'https://api.example.com';
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('URL building', () => {
+    it('builds URL with path parameters', () => {
+      const url = buildUrl(baseUrl, '/users/123');
+      expect(url).toBe('https://api.example.com/users/123');
+    });
+
+    it('builds URL with query parameters', () => {
+      const url = buildUrl(baseUrl, '/users', {q: 'john', limit: 10});
+      expect(url).toContain('q=john');
+      expect(url).toContain('limit=10');
+    });
+
+    it('skips undefined and null query parameters', () => {
+      const url = buildUrl(baseUrl, '/users', {q: 'test', skip: undefined, limit: null});
+      expect(url).toContain('q=test');
+      expect(url).not.toContain('skip');
+      expect(url).not.toContain('limit');
+    });
+
+    it('handles array query parameters', () => {
+      const url = buildUrl(baseUrl, '/users', {tags: ['admin', 'active']});
+      expect(url).toContain('tags=admin');
+      expect(url).toContain('tags=active');
+    });
+  });
+
+  describe('responseType mapping', () => {
+    it('maps arrayBuffer to arraybuffer (Angular lowercase)', () => {
+      expect(mapResponseType('arrayBuffer')).toBe('arraybuffer');
+    });
+
+    it('passes json, text, blob unchanged', () => {
+      expect(mapResponseType('json')).toBe('json');
+      expect(mapResponseType('text')).toBe('text');
+      expect(mapResponseType('blob')).toBe('blob');
+    });
+
+    it('returns undefined when no responseType', () => {
+      expect(mapResponseType(undefined)).toBeUndefined();
+    });
+  });
+
+  describe('response parsing', () => {
+    it('returns parsed JSON body for successful responses', async () => {
+      const response = httpResponse({id: 1, name: 'John'}, 200);
+      const client = createClient({baseUrl, http: mockHttp(response)});
+
+      const result = await client.request<{id: number; name: string}>({
+        method: 'GET',
+        path: '/users/1',
+      });
+
+      expect(result).toEqual({id: 1, name: 'John'});
+    });
+
+    it('returns undefined for 204 No Content', async () => {
+      const response = httpResponse(null, 204);
+      const client = createClient({baseUrl, http: mockHttp(response)});
+
+      const result = await client.request<void>({method: 'DELETE', path: '/users/1'});
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('headers', () => {
+    it('sends JSON body with Content-Type header', async () => {
+      const response = httpResponse({id: 1}, 201);
+      const http = mockHttp(response);
+      const client = createClient({baseUrl, http});
+
+      await client.request({method: 'POST', path: '/users', body: {name: 'John'}});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).toHaveProperty('Content-Type', 'application/json');
+      expect(opts.body).toEqual({name: 'John'});
+    });
+
+    it('does not set Content-Type when body is undefined', async () => {
+      const response = httpResponse([], 200);
+      const http = mockHttp(response);
+      const client = createClient({baseUrl, http});
+
+      await client.request({method: 'GET', path: '/users'});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).not.toHaveProperty('Content-Type');
+    });
+
+    it('merges default headers into every request', async () => {
+      const response = httpResponse({}, 200);
+      const http = mockHttp(response);
+      const client = createClient({
+        baseUrl,
+        defaultHeaders: {'X-Client': 'ng-openapi-signals'},
+        http,
+      });
+
+      await client.request({method: 'GET', path: '/users'});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).toHaveProperty('X-Client', 'ng-openapi-signals');
+      expect(opts.headers).toHaveProperty('Accept', 'application/json');
+    });
+
+    it('per-request headers override default headers', async () => {
+      const response = httpResponse({}, 200);
+      const http = mockHttp(response);
+      const client = createClient({
+        baseUrl,
+        defaultHeaders: {'X-Client': 'default'},
+        http,
+      });
+
+      await client.request({method: 'GET', path: '/users', headers: {'X-Client': 'override'}});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).toHaveProperty('X-Client', 'override');
+    });
+  });
+
+  describe('auth hook', () => {
+    it('merges auth headers into every request', async () => {
+      const response = httpResponse({}, 200);
+      const http = mockHttp(response);
+      const client = createClient({
+        baseUrl,
+        auth: () => ({Authorization: 'Bearer token-123'}),
+        http,
+      });
+
+      await client.request({method: 'GET', path: '/users'});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).toHaveProperty('Authorization', 'Bearer token-123');
+    });
+
+    it('supports async auth hooks', async () => {
+      const response = httpResponse({}, 200);
+      const http = mockHttp(response);
+      const client = createClient({
+        baseUrl,
+        auth: async () => {
+          await Promise.resolve();
+          return {Authorization: 'Bearer async'};
+        },
+        http,
+      });
+
+      await client.request({method: 'GET', path: '/users'});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).toHaveProperty('Authorization', 'Bearer async');
+    });
+
+    it('does not add auth headers when no auth hook is provided', async () => {
+      const response = httpResponse({}, 200);
+      const http = mockHttp(response);
+      const client = createClient({baseUrl, http});
+
+      await client.request({method: 'GET', path: '/users'});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).not.toHaveProperty('Authorization');
+    });
+  });
+
+  describe('error handling', () => {
+    it('throws ApiError on non-OK responses using the default error mapper', async () => {
+      const error = httpError(404, 'Not Found', 'Not Found');
+      const client = createClient({baseUrl, http: mockHttpError(error)});
+
+      await expect(client.request({method: 'GET', path: '/users/999'})).rejects.toMatchObject({
+        status: 404,
+        statusText: 'Not Found',
+      });
+    });
+
+    it('uses a custom error mapper when provided', async () => {
+      const error = httpError(403, 'Forbidden', 'Forbidden');
+      const customMapper: ApiErrorMapper = (err) => new Error(`Custom ${err.status}`);
+      const client = createClient({
+        baseUrl,
+        errorMapper: customMapper,
+        http: mockHttpError(error),
+      });
+
+      await expect(client.request({method: 'GET', path: '/secret'})).rejects.toThrow(
+        'Custom 403',
+      );
+    });
+  });
+
+  describe('request and response hooks', () => {
+    it('calls onRequest before the HTTP call', async () => {
+      const calls: string[] = [];
+      const response = httpResponse({}, 200);
+      const http = {
+        request: vi.fn().mockImplementation(() => {
+          calls.push('http');
+          return of(response);
+        }),
+      };
+      const client = createClient({
+        baseUrl,
+        onRequest: () => {
+          calls.push('onRequest');
+        },
+        http,
+      });
+
+      await client.request({method: 'GET', path: '/users'});
+
+      expect(calls).toEqual(['onRequest', 'http']);
+    });
+
+    it('calls onResponse after a successful response', async () => {
+      const calls: string[] = [];
+      const response = httpResponse({}, 200);
+      const http = {
+        request: vi.fn().mockImplementation(() => {
+          calls.push('http');
+          return of(response);
+        }),
+      };
+      const client = createClient({
+        baseUrl,
+        onResponse: () => {
+          calls.push('onResponse');
+        },
+        http,
+      });
+
+      await client.request({method: 'GET', path: '/users'});
+
+      expect(calls).toEqual(['http', 'onResponse']);
+    });
+
+    it('onRequest can mutate the request context', async () => {
+      const response = httpResponse({}, 200);
+      const http = mockHttp(response);
+      const client = createClient({
+        baseUrl,
+        onRequest: (ctx) => {
+          ctx.headers = {...ctx.headers, 'X-Hook': 'yes'};
+        },
+        http,
+      });
+
+      await client.request({method: 'GET', path: '/users'});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.headers).toHaveProperty('X-Hook', 'yes');
+    });
+  });
+});

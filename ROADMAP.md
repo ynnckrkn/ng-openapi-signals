@@ -2,7 +2,7 @@
 
 This roadmap outlines the planned direction for `ng-openapi-signals`.
 
-## 0.1.x - MVP Stabilization
+## 0.1.0 - MVP Stabilization
 
 - [x] Improve generated method signatures.
 - [x] Remove unnecessary `params: void` arguments.
@@ -12,7 +12,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Add basic error handling tests.
 - [x] Add GitHub Actions for build and test checks.
 
-## 0.2.x - Configuration
+## 0.2.0 - Configuration
 
 - [x] Add config file support.
 - [x] Support `ng-openapi-signals.config.ts`.
@@ -27,7 +27,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Replace the old `API_BASE_URL` token-based setup in generated clients and examples.
 - [x] Document the migration path for existing consumers.
 
-## 0.4.x - Better OpenAPI Support
+## 0.4.0 - Better OpenAPI Support
 
 - [x] Improve enum generation.
 - [x] Improve nullable type handling.
@@ -37,7 +37,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Improve fallback names for missing `operationId`.
 - [x] Add support for more success response status codes.
 
-## 0.5.x - Fetch Runtime Improvements
+## 0.5.0 - Fetch Runtime Improvements
 
 - [x] Add fetch middleware support.
 - [x] Add auth header hooks.
@@ -47,7 +47,18 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Add better handling for non-JSON responses.
 - [x] Add support for `Blob`, `ArrayBuffer` and plain text responses.
 
-## 0.6.x - Advanced Request Support
+## 0.6.0 - HttpClient Runtime Option
+
+- [x] Add an optional `HttpClient`-based runtime as an alternative to the native `fetch()` runtime.
+- [x] Add a config option to select the HTTP transport (`fetch` or `httpClient`).
+- [x] Generate an `ApiHttpClient` that wraps Angular `HttpClient` instead of `fetch()`.
+- [x] Map `resource()` loaders to `HttpClient` calls when the `httpClient` transport is selected.
+- [x] Map mutation methods to `HttpClient` calls (returning Promises via `firstValueFrom`).
+- [x] Keep the `fetch()` runtime as the default to preserve the zero-`HttpClient` guarantee.
+- [x] Document the trade-offs and migration path between the `fetch` and `httpClient` transports.
+- [x] Add tests covering both runtime transports.
+
+## 0.7.x - Advanced Request Support
 
 - Add advanced query parameter serialization.
 - Support OpenAPI parameter styles.
@@ -56,7 +67,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - Add file download support.
 - Add support for custom content types.
 
-## 0.7.x - Developer Experience
+## 0.8.x - Developer Experience
 
 - Add better CLI output.
 - Add `--watch` mode.
@@ -66,7 +77,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - Add more example projects.
 - Add Angular example app.
 
-## 0.8.x - Testing and Quality
+## 0.9.x - Testing and Quality
 
 - Add fixture-based generator tests.
 - Add snapshot tests for generated output.

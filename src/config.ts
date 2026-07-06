@@ -5,11 +5,13 @@ import {createJiti} from 'jiti';
 import type {
   GeneratorConfig,
   GroupBy,
+  HttpTransport,
   PartialGeneratorConfig,
   RuntimeConfig,
 } from './codegen/types';
 
 export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
+  transport: 'fetch',
   defaultHeaders: {},
   responseTypeHints: true,
 };
@@ -91,6 +93,7 @@ function mergeRuntime(
   ...layers: (RuntimeConfig | undefined)[]
 ): RuntimeConfig {
   const result: RuntimeConfig = {
+    transport: 'fetch',
     defaultHeaders: {},
     responseTypeHints: true,
   };
@@ -98,6 +101,10 @@ function mergeRuntime(
   for (const layer of layers) {
     if (!layer) {
       continue;
+    }
+
+    if (layer.transport !== undefined) {
+      result.transport = layer.transport;
     }
 
     if (layer.defaultHeaders) {
@@ -167,6 +174,16 @@ export function validateConfig(config: GeneratorConfig): void {
       'Invalid runtime.responseTypeHints: must be a boolean.',
     );
   }
+
+  if (
+    runtime?.transport !== undefined &&
+    runtime.transport !== 'fetch' &&
+    runtime.transport !== 'httpClient'
+  ) {
+    throw new Error(
+      `Invalid runtime.transport: '${runtime.transport}'. Must be 'fetch' or 'httpClient'.`,
+    );
+  }
 }
 
 /**
@@ -174,4 +191,11 @@ export function validateConfig(config: GeneratorConfig): void {
  */
 export function isGroupBy(value: unknown): value is GroupBy {
   return value === 'tag' || value === 'path';
+}
+
+/**
+ * Type guard for the `HttpTransport` union.
+ */
+export function isTransport(value: unknown): value is HttpTransport {
+  return value === 'fetch' || value === 'httpClient';
 }

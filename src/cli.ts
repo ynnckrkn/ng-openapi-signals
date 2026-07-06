@@ -1,14 +1,14 @@
 import {Command} from 'commander';
 import {generate} from './generate';
 import {loadConfig, resolveConfig, validateConfig} from './config';
-import {isGroupBy} from './config';
+import {isGroupBy, isTransport} from './config';
 
 const program = new Command();
 
 program
   .name('ng-openapi-signals')
   .description('Signal-first OpenAPI client generator for Angular using resource() and fetch().')
-  .version('0.5.0');
+  .version('0.6.0');
 
 program
   .command('generate')
@@ -19,6 +19,7 @@ program
   .option('--clean', 'Clean output directory before generation (default: true)')
   .option('--no-clean', 'Preserve existing files in output directory')
   .option('--group-by <mode>', 'Group APIs by tag or path (default: tag)')
+  .option('--transport <type>', 'HTTP transport: fetch or httpClient (default: fetch)')
   .action(async (options) => {
     try {
       const fileConfig = await loadConfig(options.config);
@@ -29,6 +30,9 @@ program
         ...(options.clean !== undefined ? {clean: options.clean} : {}),
         ...(options.groupBy !== undefined && isGroupBy(options.groupBy)
           ? {groupBy: options.groupBy}
+          : {}),
+        ...(options.transport !== undefined && isTransport(options.transport)
+          ? {runtime: {transport: options.transport}}
           : {}),
       };
 

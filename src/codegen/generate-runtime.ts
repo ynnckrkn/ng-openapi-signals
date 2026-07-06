@@ -1,15 +1,33 @@
 import type {GeneratorConfig} from './types';
 
 export function generateRuntimeFiles(config: GeneratorConfig): Record<string, string> {
+  const transport = config.runtime?.transport ?? 'fetch';
+
+  if (transport === 'httpClient') {
+    return {
+      'providers.ts': generateProviders(config),
+      'api-error.ts': generateApiError(config),
+      'api-http-client.ts': generateApiHttpClient(config),
+      'signal-utils.ts': generateSignalUtils(),
+    };
+  }
+
   return {
     'providers.ts': generateProviders(config),
-    'api-error.ts': generateApiError(),
+    'api-error.ts': generateApiError(config),
     'api-fetch-client.ts': generateApiFetchClient(config),
     'signal-utils.ts': generateSignalUtils(),
   };
 }
 
 function generateProviders(config: GeneratorConfig): string {
+  const transport = config.runtime?.transport ?? 'fetch';
+  return transport === 'httpClient'
+    ? generateProvidersHttpClient(config)
+    : generateProvidersFetch(config);
+}
+
+function generateProvidersFetch(config: GeneratorConfig): string {
   const defaultHeaders = config.runtime?.defaultHeaders ?? {};
   const defaultHeadersLiteral = objectLiteral(defaultHeaders);
 
@@ -127,7 +145,136 @@ export function provideNgOpenapiSignals(
 `;
 }
 
-function generateApiError(): string {
+function generateProvidersHttpClient(config: GeneratorConfig): string {
+  const defaultHeaders = config.runtime?.defaultHeaders ?? {};
+  const defaultHeadersLiteral = objectLiteral(defaultHeaders);
+
+  return `import { EnvironmentProviders, InjectionToken, makeEnvironmentProviders } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, HttpResponse } from '@angular/common/http';
+import { toApiErrorFromHttpErrorResponse, ApiError } from './api-error';
+
+export const NG_OPENAPI_SIGNALS_BASE_PATH = new InjectionToken<string>('NG_OPENAPI_SIGNALS_BASE_PATH');
+
+export const NG_OPENAPI_SIGNALS_AUTH = new InjectionToken<ApiAuthHook | undefined>(
+  'NG_OPENAPI_SIGNALS_AUTH',
+);
+
+export const NG_OPENAPI_SIGNALS_DEFAULT_HEADERS = new InjectionToken<Record<string, string>>(
+  'NG_OPENAPI_SIGNALS_DEFAULT_HEADERS',
+);
+
+export const NG_OPENAPI_SIGNALS_ERROR_MAPPER = new InjectionToken<ApiErrorMapper>(
+  'NG_OPENAPI_SIGNALS_ERROR_MAPPER',
+);
+
+export const NG_OPENAPI_SIGNALS_REQUEST_HOOK = new InjectionToken<
+  ApiRequestHook | undefined
+>('NG_OPENAPI_SIGNALS_REQUEST_HOOK');
+
+export const NG_OPENAPI_SIGNALS_RESPONSE_HOOK = new InjectionToken<
+  ApiResponseHook | undefined
+>('NG_OPENAPI_SIGNALS_RESPONSE_HOOK');
+
+/**
+ * Hook that returns additional headers to merge into every request.
+ * Called once per request. Useful for auth tokens that may rotate.
+ */
+export type ApiAuthHook = () => Record<string, string> | Promise<Record<string, string>>;
+
+/**
+ * Maps a non-OK \`HttpErrorResponse\` to an error. Defaults to \`toApiErrorFromHttpErrorResponse\`.
+ */
+export type ApiErrorMapper = (
+  response: HttpErrorResponse,
+) => Promise<ApiError | Error> | ApiError | Error;
+
+/**
+ * Called before the request is sent. Can mutate the request context
+ * (e.g. add headers, change the URL). Return value is ignored.
+ */
+export type ApiRequestHook = (request: ApiRequestContext) => void | Promise<void>;
+
+/**
+ * Called after a successful response is received. Receives the raw \`HttpResponse\`.
+ * Return value is ignored.
+ */
+export type ApiResponseHook = (response: HttpResponse<unknown>) => void | Promise<void>;
+
+export interface ApiRequestContext {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: unknown;
+}
+
+export interface NgOpenapiSignalsOptions {
+  basePath: string;
+  auth?: ApiAuthHook;
+  defaultHeaders?: Record<string, string>;
+  errorMapper?: ApiErrorMapper;
+  onRequest?: ApiRequestHook;
+  onResponse?: ApiResponseHook;
+}
+
+export function provideNgOpenapiSignals(
+  options: NgOpenapiSignalsOptions,
+): EnvironmentProviders {
+  return makeEnvironmentProviders([
+    provideHttpClient(),
+    {
+      provide: NG_OPENAPI_SIGNALS_BASE_PATH,
+      useValue: options.basePath,
+    },
+    {
+      provide: NG_OPENAPI_SIGNALS_AUTH,
+      useValue: options.auth,
+    },
+    {
+      provide: NG_OPENAPI_SIGNALS_DEFAULT_HEADERS,
+      useValue: { ...${defaultHeadersLiteral}, ...options.defaultHeaders },
+    },
+    {
+      provide: NG_OPENAPI_SIGNALS_ERROR_MAPPER,
+      useValue: options.errorMapper ?? toApiErrorFromHttpErrorResponse,
+    },
+    {
+      provide: NG_OPENAPI_SIGNALS_REQUEST_HOOK,
+      useValue: options.onRequest,
+    },
+    {
+      provide: NG_OPENAPI_SIGNALS_RESPONSE_HOOK,
+      useValue: options.onResponse,
+    },
+  ]);
+}
+`;
+}
+
+function generateApiError(config: GeneratorConfig): string {
+  const transport = config.runtime?.transport ?? 'fetch';
+
+  if (transport === 'httpClient') {
+    return `import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+
+export interface ApiError {
+  status: number;
+  statusText: string;
+  body: unknown;
+  headers: HttpHeaders;
+}
+
+export function toApiErrorFromHttpErrorResponse(error: HttpErrorResponse): ApiError {
+  return {
+    status: error.status,
+    statusText: error.statusText,
+    body: error.error,
+    headers: error.headers
+  };
+}
+`;
+  }
+
   return `export interface ApiError {
   status: number;
   statusText: string;
@@ -279,6 +426,139 @@ export class ApiFetchClient {
     }
 
     return response.blob();
+  }
+
+  private buildUrl(path: string, query?: Record<string, unknown>): string {
+    const url = new URL(path, this.baseUrl);
+
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value === undefined || value === null) {
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          url.searchParams.append(key, String(item));
+        }
+      } else {
+        url.searchParams.set(key, String(value));
+      }
+    }
+
+    return url.toString();
+  }
+}
+`;
+}
+
+function generateApiHttpClient(config: GeneratorConfig): string {
+  const responseTypeHints = config.runtime?.responseTypeHints ?? true;
+  const responseTypeField = responseTypeHints
+    ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer';\n`
+    : '';
+
+  return `import { Service, inject } from '@angular/core';
+import { HttpClient, HttpErrorResponse, HttpResponse } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import {
+  NG_OPENAPI_SIGNALS_BASE_PATH,
+  NG_OPENAPI_SIGNALS_AUTH,
+  NG_OPENAPI_SIGNALS_DEFAULT_HEADERS,
+  NG_OPENAPI_SIGNALS_ERROR_MAPPER,
+  NG_OPENAPI_SIGNALS_REQUEST_HOOK,
+  NG_OPENAPI_SIGNALS_RESPONSE_HOOK,
+  type ApiRequestContext,
+} from './providers';
+
+export interface ApiRequestOptions {
+  method: string;
+  path: string;
+  query?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  body?: unknown;
+  signal?: AbortSignal;
+${responseTypeField}}
+
+@Service()
+export class ApiHttpClient {
+  private readonly baseUrl = inject(NG_OPENAPI_SIGNALS_BASE_PATH);
+  private readonly http = inject(HttpClient);
+  private readonly auth = inject(NG_OPENAPI_SIGNALS_AUTH, { optional: true });
+  private readonly defaultHeaders = inject(NG_OPENAPI_SIGNALS_DEFAULT_HEADERS);
+  private readonly errorMapper = inject(NG_OPENAPI_SIGNALS_ERROR_MAPPER);
+  private readonly onRequest = inject(NG_OPENAPI_SIGNALS_REQUEST_HOOK, { optional: true });
+  private readonly onResponse = inject(NG_OPENAPI_SIGNALS_RESPONSE_HOOK, { optional: true });
+
+  async request<T>(options: ApiRequestOptions): Promise<T> {
+    const url = this.buildUrl(options.path, options.query);
+
+    const authHeaders = this.auth ? await this.auth() : {};
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      ...this.defaultHeaders,
+      ...authHeaders,
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers
+    };
+
+    const context: ApiRequestContext = {
+      url,
+      method: options.method,
+      headers,
+      body: options.body
+    };
+
+    if (this.onRequest) {
+      await this.onRequest(context);
+    }
+
+    const responseType = this.mapResponseType(options.responseType);
+
+    try {
+      const response = await firstValueFrom(
+        this.http.request<unknown>(
+          context.method,
+          context.url,
+          {
+            headers: context.headers,
+            ...(context.body !== undefined ? { body: context.body } : {}),
+            observe: 'response',
+            ...(responseType ? { responseType: responseType as 'json' | 'text' | 'blob' | 'arraybuffer' } : {}),
+            ...(options.signal ? { signal: options.signal } : {})
+          },
+        ),
+      ) as HttpResponse<unknown>;
+
+      if (this.onResponse) {
+        await this.onResponse(response);
+      }
+
+      if (response.status === 204) {
+        return undefined as unknown as T;
+      }
+
+      return response.body as T;
+    } catch (error) {
+      if (error instanceof HttpErrorResponse) {
+        throw await this.errorMapper(error);
+      }
+      throw error;
+    }
+  }
+
+  private mapResponseType(
+    responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer',
+  ): 'json' | 'text' | 'blob' | 'arraybuffer' | undefined {
+    if (!responseType) {
+      return undefined;
+    }
+    switch (responseType) {
+      case 'arrayBuffer':
+        return 'arraybuffer';
+      default:
+        return responseType;
+    }
   }
 
   private buildUrl(path: string, query?: Record<string, unknown>): string {

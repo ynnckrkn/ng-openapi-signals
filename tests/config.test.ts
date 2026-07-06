@@ -7,6 +7,7 @@ import {
   validateConfig,
   defineConfig,
   isGroupBy,
+  isTransport,
   DEFAULT_CONFIG,
   DEFAULT_RUNTIME_CONFIG,
 } from '../src/config.js';
@@ -81,6 +82,7 @@ describe('config', () => {
     it('provides default runtime config when no overrides given', () => {
       const config = resolveConfig({}, {});
       expect(config.runtime).toEqual(DEFAULT_RUNTIME_CONFIG);
+      expect(config.runtime.transport).toBe('fetch');
       expect(config.runtime.defaultHeaders).toEqual({});
       expect(config.runtime.responseTypeHints).toBe(true);
     });
@@ -137,6 +139,34 @@ describe('config', () => {
       );
       expect(config.runtime.responseTypeHints).toBe(false);
       expect(config.runtime.defaultHeaders).toEqual({'X-A': 'a'});
+    });
+
+    it('defaults transport to fetch when not specified', () => {
+      const config = resolveConfig({}, {});
+      expect(config.runtime.transport).toBe('fetch');
+    });
+
+    it('file runtime.transport overrides default', () => {
+      const config = resolveConfig({}, {runtime: {transport: 'httpClient'}});
+      expect(config.runtime.transport).toBe('httpClient');
+    });
+
+    it('CLI runtime.transport overrides file', () => {
+      const config = resolveConfig(
+        {runtime: {transport: 'fetch'}},
+        {runtime: {transport: 'httpClient'}},
+      );
+      expect(config.runtime.transport).toBe('fetch');
+    });
+
+    it('preserves unrelated runtime fields when transport is overridden', () => {
+      const config = resolveConfig(
+        {runtime: {transport: 'httpClient'}},
+        {runtime: {defaultHeaders: {'X-A': 'a'}, responseTypeHints: false}},
+      );
+      expect(config.runtime.transport).toBe('httpClient');
+      expect(config.runtime.defaultHeaders).toEqual({'X-A': 'a'});
+      expect(config.runtime.responseTypeHints).toBe(false);
     });
   });
 
@@ -202,6 +232,39 @@ describe('config', () => {
         }),
       ).not.toThrow();
     });
+
+    it('does not throw when transport is fetch', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {transport: 'fetch'},
+        }),
+      ).not.toThrow();
+    });
+
+    it('does not throw when transport is httpClient', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {transport: 'httpClient'},
+        }),
+      ).not.toThrow();
+    });
+
+    it('throws when transport is invalid', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {transport: 'axios' as unknown as 'fetch'},
+        }),
+      ).toThrow('Invalid runtime.transport');
+    });
   });
 
   describe('defineConfig', () => {
@@ -221,6 +284,18 @@ describe('config', () => {
     it('returns false for invalid values', () => {
       expect(isGroupBy('invalid')).toBe(false);
       expect(isGroupBy(undefined)).toBe(false);
+    });
+  });
+
+  describe('isTransport', () => {
+    it('returns true for fetch and httpClient', () => {
+      expect(isTransport('fetch')).toBe(true);
+      expect(isTransport('httpClient')).toBe(true);
+    });
+
+    it('returns false for invalid values', () => {
+      expect(isTransport('invalid')).toBe(false);
+      expect(isTransport(undefined)).toBe(false);
     });
   });
 });

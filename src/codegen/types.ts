@@ -3,6 +3,15 @@ export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 export type GroupBy = 'tag' | 'path';
 
 /**
+ * The HTTP transport used by the generated runtime.
+ *
+ * - `'fetch'` (default): native `fetch()`, zero `HttpClient` dependency.
+ * - `'httpClient'`: Angular `HttpClient` wrapper, integrates with the
+ *   Angular interceptor ecosystem and `provideHttpClient()`.
+ */
+export type HttpTransport = 'fetch' | 'httpClient';
+
+/**
  * Runtime-related generator options.
  *
  * These influence the generated runtime files (providers, fetch client).
@@ -11,6 +20,15 @@ export type GroupBy = 'tag' | 'path';
  * `provideNgOpenapiSignals`. Only static, codegen-time defaults live here.
  */
 export interface RuntimeConfig {
+  /**
+   * Selects the HTTP transport for the generated runtime.
+   *
+   * - `'fetch'` (default): generates `ApiFetchClient` using native `fetch()`.
+   * - `'httpClient'`: generates `ApiHttpClient` wrapping Angular `HttpClient`.
+   *
+   * The `fetch` transport preserves the zero-`HttpClient` guarantee.
+   */
+  transport?: HttpTransport;
   /**
    * Static default headers merged into every request. These are baked into
    * the generated `provideNgOpenapiSignals` default and can be overridden

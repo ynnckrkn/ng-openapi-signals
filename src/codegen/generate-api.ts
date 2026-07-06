@@ -80,6 +80,10 @@ function generateService(
     (op) => op.method === 'get' && op.pathParams.length + op.queryParams.length > 0,
   );
   const responseTypeHints = config.runtime?.responseTypeHints ?? true;
+  const transport = config.runtime?.transport ?? 'fetch';
+  const clientClassName = transport === 'httpClient' ? 'ApiHttpClient' : 'ApiFetchClient';
+  const clientImportPath =
+    transport === 'httpClient' ? '../api-http-client' : '../api-fetch-client';
 
   const angularImports = ['Service', 'inject'];
   if (hasGets) {
@@ -103,11 +107,11 @@ function generateService(
     .join('\n\n');
 
   return `import { ${angularImports.join(', ')} } from '@angular/core';
-import { ApiFetchClient } from '../api-fetch-client';
+import { ${clientClassName} } from '${clientImportPath}';
 ${signalUtilImport}${modelImportLine}
 @Service()
 export class ${serviceName} {
-  private readonly client = inject(ApiFetchClient);
+  private readonly client = inject(${clientClassName});
 
 ${methods}
 }

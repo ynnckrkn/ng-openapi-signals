@@ -9,6 +9,7 @@ import {generateRuntimeFiles} from './codegen/generate-runtime';
 import {hoistInlineSchemas} from './codegen/inline-schemas';
 
 const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
+  transport: 'fetch',
   defaultHeaders: {},
   responseTypeHints: true,
 };
@@ -19,6 +20,7 @@ function withRuntimeDefaults(config: GeneratorConfig): GeneratorConfig {
   return {
     ...config,
     runtime: {
+      transport: runtime.transport ?? 'fetch',
       defaultHeaders: runtime.defaultHeaders ?? {},
       responseTypeHints: runtime.responseTypeHints ?? true,
     },
@@ -50,7 +52,7 @@ export async function generate(config: GeneratorConfig): Promise<void> {
     ...generateRuntimeFiles(normalizedConfig),
     ...generateModelFiles(schemas),
     ...generateApiFiles(operations, normalizedConfig),
-    'index.ts': generateIndexFile(),
+    'index.ts': generateIndexFile(normalizedConfig),
   };
 
   for (const [fileName, content] of Object.entries(files)) {
@@ -69,10 +71,16 @@ export async function generate(config: GeneratorConfig): Promise<void> {
   }
 }
 
-function generateIndexFile(): string {
+function generateIndexFile(config: GeneratorConfig): string {
+  const transport = config.runtime?.transport ?? 'fetch';
+  const clientExport =
+    transport === 'httpClient'
+      ? "export * from './api-http-client';"
+      : "export * from './api-fetch-client';";
+
   return `export * from './providers';
 export * from './api-error';
-export * from './api-fetch-client';
+${clientExport}
 export * from './signal-utils';
 export * from './models';
 export * from './resources';

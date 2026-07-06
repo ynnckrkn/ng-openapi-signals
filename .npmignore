@@ -10,3 +10,5 @@ AGENTS.md
 eslint.config.js
 tests
 tsconfig.test.json
+CHANGELOG.md
+RUNTIME.md

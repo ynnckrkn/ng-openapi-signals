@@ -1,6 +1,6 @@
 {
   "name": "ng-openapi-signals",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Signal-first OpenAPI client generator for Angular using resource() and fetch().",
   "type": "module",
   "bin": {
@@ -15,8 +15,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE",
-    "CHANGELOG.md"
+    "LICENSE"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
