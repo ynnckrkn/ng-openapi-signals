@@ -96,8 +96,10 @@ instead of `ApiFetchClient`. It wraps Angular `HttpClient` and handles:
 - Request and response hooks
 - Custom error mapping (via `toApiErrorFromHttpErrorResponse`)
 
-`provideNgOpenapiSignals()` automatically includes `provideHttpClient()` when
-the `httpClient` transport is selected.
+`provideNgOpenapiSignals()` does **not** include `provideHttpClient()` — when
+using the `httpClient` transport, register `provideHttpClient()` yourself (e.g.
+`provideHttpClient(withInterceptors([...]))`) so you keep full control over
+interceptors and their order.
 
 ### `provideNgOpenapiSignals()`
 

@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-06
+
+### Changed
+
+- **`provideHttpClient()` no longer auto-included**: `provideNgOpenapiSignals()` no longer automatically includes `provideHttpClient()` when the `httpClient` transport is selected. Users must register `provideHttpClient()` themselves (e.g. `provideHttpClient(withInterceptors([...]))`) so they keep full control over interceptors and their order.
+
 ## [0.6.1] - 2026-07-06
 
 ### Fixed
@@ -20,7 +26,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **HttpClient runtime transport**: An optional `httpClient` transport can be selected via `runtime.transport: 'httpClient'` in the config file or `--transport httpClient` on the CLI. When selected, the generator emits `ApiHttpClient` (wrapping Angular `HttpClient`) instead of `ApiFetchClient` (wrapping native `fetch()`). The `fetch` transport remains the default, preserving the zero-`HttpClient` guarantee.
 - **`ApiHttpClient` service**: Generated `@Service()` class that wraps Angular `HttpClient`, injects the same DI tokens (`NG_OPENAPI_SIGNALS_BASE_PATH`, `NG_OPENAPI_SIGNALS_AUTH`, `NG_OPENAPI_SIGNALS_DEFAULT_HEADERS`, `NG_OPENAPI_SIGNALS_ERROR_MAPPER`, `NG_OPENAPI_SIGNALS_REQUEST_HOOK`, `NG_OPENAPI_SIGNALS_RESPONSE_HOOK`), and returns Promises via `firstValueFrom`.
 - **`toApiErrorFromHttpErrorResponse`**: Generated error mapper for the httpClient transport that converts `HttpErrorResponse` to the shared `ApiError` interface.
-- **`provideHttpClient()` auto-inclusion**: `provideNgOpenapiSignals()` automatically includes `provideHttpClient()` when the httpClient transport is selected.
 - **`--transport` CLI flag**: New CLI option to select the HTTP transport (`fetch` or `httpClient`).
 - **`isTransport` type guard**: Exported from `config.ts` for validating the `transport` option.
 - **`HttpTransport` type**: Exported from `codegen/types.ts`.
@@ -31,7 +36,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `RuntimeConfig` now includes a `transport` field (default `'fetch'`).
 - `generateRuntimeFiles` branches on `transport` to emit either `api-fetch-client.ts` or `api-http-client.ts`.
 - `generateApiError` branches on `transport` to emit either `toApiError` (fetch) or `toApiErrorFromHttpErrorResponse` (httpClient).
-- `generateProviders` branches on `transport`: the httpClient variant omits `NG_OPENAPI_SIGNALS_MIDDLEWARE` and includes `provideHttpClient()`.
+- `generateProviders` branches on `transport`: the httpClient variant omits `NG_OPENAPI_SIGNALS_MIDDLEWARE` and does not include `provideHttpClient()` (users register it themselves).
 - `generateService` branches on `transport` to import and inject `ApiHttpClient` or `ApiFetchClient`.
 - `generateIndexFile` branches on `transport` to export `./api-http-client` or `./api-fetch-client`.
 - `mergeRuntime` and `validateConfig` now handle the `transport` field.

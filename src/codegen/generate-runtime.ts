@@ -150,7 +150,6 @@ function generateProvidersHttpClient(config: GeneratorConfig): string {
   const defaultHeadersLiteral = objectLiteral(defaultHeaders);
 
   return `import { EnvironmentProviders, InjectionToken, makeEnvironmentProviders } from '@angular/core';
-import { provideHttpClient } from '@angular/common/http';
 import { HttpErrorResponse, HttpResponse } from '@angular/common/http';
 import { toApiErrorFromHttpErrorResponse, ApiError } from './api-error';
 
@@ -221,7 +220,6 @@ export function provideNgOpenapiSignals(
   options: NgOpenapiSignalsOptions,
 ): EnvironmentProviders {
   return makeEnvironmentProviders([
-    provideHttpClient(),
     {
       provide: NG_OPENAPI_SIGNALS_BASE_PATH,
       useValue: options.basePath,

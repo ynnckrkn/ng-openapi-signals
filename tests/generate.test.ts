@@ -131,7 +131,7 @@ describe('generate', () => {
     expect(indexContent).not.toContain("export * from './api-fetch-client';");
 
     const providersContent = await readFile(join(OUTPUT_DIR, 'providers.ts'), 'utf8');
-    expect(providersContent).toContain('provideHttpClient');
+    expect(providersContent).not.toContain('provideHttpClient');
     expect(providersContent).not.toContain('NG_OPENAPI_SIGNALS_MIDDLEWARE');
 
     const apiContent = await readFile(join(OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');

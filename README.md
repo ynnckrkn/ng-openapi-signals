@@ -314,8 +314,7 @@ ng-openapi-signals generate --input ./openapi.json --output ./src/generated/api 
 When `httpClient` is selected:
 
 - The generator emits `ApiHttpClient` instead of `ApiFetchClient`.
-- `provideNgOpenapiSignals()` automatically includes `provideHttpClient()`.
-- Use Angular `HttpInterceptors` via `provideHttpClient(withInterceptors([...]))` instead of fetch middleware.
+- `provideNgOpenapiSignals()` does **not** include `provideHttpClient()` — register it yourself in your app config (e.g. `provideHttpClient(withInterceptors([...]))`) so you keep full control over interceptors and their order.
 - The `NG_OPENAPI_SIGNALS_MIDDLEWARE` token is not emitted.
 - Generated API service methods (`resource()` loaders, mutations) remain identical — only the underlying client changes.
 
