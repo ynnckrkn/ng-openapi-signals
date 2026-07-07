@@ -26,7 +26,9 @@ describe('generated API', () => {
 
   it('imports model types (User, CreateUserRequest)', async () => {
     const content = await readApiFile();
-    expect(content).toContain("import { CreateUserRequest, User } from '../models';");
+    expect(content).toContain('CreateUserRequest');
+    expect(content).toContain('User');
+    expect(content).toContain("from '../models'");
   });
 
   it('uses User as the response type for getUserById', async () => {

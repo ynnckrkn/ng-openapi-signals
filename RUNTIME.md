@@ -74,8 +74,12 @@ The generated `ApiFetchClient` wraps native `fetch()` and handles:
 
 - Base URL handling
 - JSON request bodies
-- JSON, text, `Blob` and `ArrayBuffer` responses (spec-driven with content-type fallback)
-- Query parameters
+- Multipart form data (`FormData`) and `application/x-www-form-urlencoded` (`URLSearchParams`)
+- `Blob`/`ArrayBuffer` body passthrough (no JSON serialization)
+- Custom request content types
+- JSON, text, `Blob`, `ArrayBuffer` and `ReadableStream` responses (spec-driven with content-type fallback)
+- Query parameters with OpenAPI `style`/`explode` serialization
+- Header parameters
 - Abort signals
 - Default headers (static via config + runtime via `auth` hook)
 - Onion-style fetch middleware
@@ -89,8 +93,12 @@ instead of `ApiFetchClient`. It wraps Angular `HttpClient` and handles:
 
 - Base URL handling
 - JSON request bodies
-- JSON, text, `Blob` and `ArrayBuffer` responses
-- Query parameters
+- Multipart form data (`FormData`) and `application/x-www-form-urlencoded` (`URLSearchParams`)
+- `Blob`/`ArrayBuffer` body passthrough
+- Custom request content types
+- JSON, text, `Blob`, `ArrayBuffer` and stream responses (`stream` maps to `blob` — Angular `HttpClient` has no native stream; call `.stream()` on the returned `Blob`)
+- Query parameters with OpenAPI `style`/`explode` serialization
+- Header parameters
 - Abort signals
 - Default headers (static via config + runtime via `auth` hook)
 - Request and response hooks
@@ -148,11 +156,60 @@ Generated methods emit a `responseType` hint derived from the OpenAPI response
 | -------------------------------------------------------------- | -------------- | ---------------------- |
 | `application/json` (and `*+json`)                              | `'json'`       | inferred from schema   |
 | `text/*`                                                       | `'text'`       | `string`               |
+| `text/event-stream`                                            | `'stream'`     | `string` (fetch: `ReadableStream`, httpClient: `Blob`) |
 | `image/*`, `audio/*`, `video/*`, `octet-stream`, `multipart/*` | `'blob'`       | `Blob`                 |
 
 For responses without a known content type the runtime falls back to
 content-type sniffing. Set `runtime.responseTypeHints: false` in the config
 file to disable hints and rely solely on runtime sniffing.
+
+### `ApiRequestOptions`
+
+The generated methods call `this.client.request<T>(options)` with these fields:
+
+| Field         | Type                                              | Description                                                              |
+| ------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
+| `method`      | `string`                                          | HTTP method (`'GET'`, `'POST'`, ...)                                     |
+| `path`        | `string`                                          | URL path (with path params interpolated)                                |
+| `query`       | `Record<string, unknown \| QueryParamOptions>`    | Query params (plain values or wrapped with style/explode metadata)     |
+| `headers`     | `Record<string, string>`                       | Per-request headers (merged over defaults)                               |
+| `body`        | `unknown`                                         | Request body (JSON-serialized unless `FormData`/`Blob`/`ArrayBuffer`)    |
+| `formData`    | `Record<string, unknown>`                       | Form data object (built into `FormData` or `URLSearchParams` by runtime) |
+| `contentType` | `string`                                          | Explicit Content-Type (defaults to `application/json` for JSON bodies)  |
+| `signal`     | `AbortSignal`                                     | Abort signal for cancellation                                            |
+| `responseType`| `'json' \| 'text' \| 'blob' \| 'arrayBuffer' \| 'stream'` | Response parser hint                                                     |
+
+### Query Parameter Serialization
+
+For parameters with non-default OpenAPI `style`/`explode`, the generated code
+wraps the value with metadata so the runtime can serialize it correctly:
+
+```ts
+query: {
+  tags: { value: params.tags, style: 'spaceDelimited', explode: false },
+  q: params.q,  // default style: form + explode:true — plain value
+}
+```
+
+The runtime `buildUrl` method serializes according to the style:
+
+| Style             | `explode: true`           | `explode: false`           |
+| ----------------- | -------------------------- | -------------------------- |
+| `form`            | `key=val1&key=val2`        | `key=val1,val2`             |
+| `spaceDelimited`  | `key=val1&key=val2`        | `key=val1%20val2`           |
+| `pipeDelimited`   | `key=val1&key=val2`        | `key=val1\|val2`            |
+| `deepObject`      | `key[prop]=val`            | —                          |
+
+### Multipart Form Data
+
+When a request body uses `multipart/form-data`, the generated method passes
+`formData: body` instead of `body:`. The runtime builds a `FormData` object:
+
+- `Blob` values are appended directly (no serialization)
+- Other values are converted to strings
+- The browser sets the `Content-Type` with the multipart boundary automatically
+
+For `application/x-www-form-urlencoded`, the runtime builds `URLSearchParams`.
 
 ---
 

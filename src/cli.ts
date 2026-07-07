@@ -1,7 +1,7 @@
 import {Command} from 'commander';
 import {generate} from './generate';
 import {loadConfig, resolveConfig, validateConfig} from './config';
-import {isGroupBy, isTransport} from './config';
+import {isGroupBy, isQueryStyle, isTransport} from './config';
 
 const program = new Command();
 
@@ -20,6 +20,9 @@ program
   .option('--no-clean', 'Preserve existing files in output directory')
   .option('--group-by <mode>', 'Group APIs by tag or path (default: tag)')
   .option('--transport <type>', 'HTTP transport: fetch or httpClient (default: fetch)')
+  .option('--default-query-style <style>', 'Default query param style: form, spaceDelimited, pipeDelimited, or deepObject')
+  .option('--default-query-explode <bool>', 'Default query param explode (true/false)')
+  .option('--prefer-content-type <type>', 'Preferred request content type when multiple are offered')
   .action(async (options) => {
     try {
       const fileConfig = await loadConfig(options.config);
@@ -33,6 +36,15 @@ program
           : {}),
         ...(options.transport !== undefined && isTransport(options.transport)
           ? {runtime: {transport: options.transport}}
+          : {}),
+        ...(options.defaultQueryStyle !== undefined && isQueryStyle(options.defaultQueryStyle)
+          ? {runtime: {defaultQueryStyle: options.defaultQueryStyle}}
+          : {}),
+        ...(options.defaultQueryExplode !== undefined
+          ? {runtime: {defaultQueryExplode: options.defaultQueryExplode === 'true'}}
+          : {}),
+        ...(options.preferContentType !== undefined
+          ? {runtime: {preferContentType: options.preferContentType}}
           : {}),
       };
 

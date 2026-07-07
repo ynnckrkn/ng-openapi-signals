@@ -1,8 +1,21 @@
-import type {GeneratorConfig, HttpMethod, OperationModel, ParameterModel} from './types';
+import type {
+  GeneratorConfig,
+  HttpMethod,
+  MultipartPartModel,
+  OperationModel,
+  ParameterModel,
+  QueryStyle,
+  RequestBodyModel,
+} from './types';
 import {camelCase, kebabCase, pascalCase, serviceNameFromTag} from './naming';
 import {schemaToTsType} from './schema-to-ts';
 
 const HTTP_METHODS: HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete'];
+
+/** Default query style per OpenAPI spec: `form` for query/header params. */
+const DEFAULT_QUERY_STYLE: QueryStyle = 'form';
+/** Default explode per OpenAPI spec: `true` for `form` style query params. */
+const DEFAULT_QUERY_EXPLODE = true;
 
 export function extractOperations(api: any): OperationModel[] {
   const operations: OperationModel[] = [];
@@ -25,7 +38,11 @@ export function extractOperations(api: any): OperationModel[] {
         .filter((parameter: any) => parameter.in === 'query')
         .map(toParameterModel);
 
-      const requestBodyType = extractRequestBodyType(operation);
+      const headerParams = parameters
+        .filter((parameter: any) => parameter.in === 'header')
+        .map(toParameterModel);
+
+      const requestBody = extractRequestBody(operation);
       const {responseType, responseParser} = extractResponseType(operation);
 
       operations.push({
@@ -35,9 +52,10 @@ export function extractOperations(api: any): OperationModel[] {
         path,
         pathParams,
         queryParams,
+        headerParams,
         responseType,
         ...(responseParser ? {responseParser} : {}),
-        ...(requestBodyType ? {requestBodyType} : {}),
+        ...(requestBody ? {requestBody, requestBodyType: requestBody.type} : {}),
       });
     }
   }
@@ -50,8 +68,7 @@ export function generateApiFiles(
   config: GeneratorConfig,
 ): Record<string, string> {
   const files: Record<string, string> = {};
-  const grouped =
-    config.groupBy === 'path' ? groupByPath(operations) : groupByTag(operations);
+  const grouped = config.groupBy === 'path' ? groupByPath(operations) : groupByTag(operations);
 
   for (const [group, groupOperations] of Object.entries(grouped)) {
     files[`resources/${kebabCase(group)}.api.ts`] = generateService(
@@ -77,7 +94,14 @@ function generateService(
   const modelImports = collectModelImports(operations);
   const hasGets = operations.some((op) => op.method === 'get');
   const hasGetsWithParams = operations.some(
-    (op) => op.method === 'get' && op.pathParams.length + op.queryParams.length > 0,
+    (op) =>
+      op.method === 'get' &&
+      op.pathParams.length + op.queryParams.length + op.headerParams.length > 0,
+  );
+  const hasMutationsWithParams = operations.some(
+    (op) =>
+      op.method !== 'get' &&
+      op.pathParams.length + op.queryParams.length + op.headerParams.length > 0,
   );
   const responseTypeHints = config.runtime?.responseTypeHints ?? true;
   const transport = config.runtime?.transport ?? 'fetch';
@@ -91,7 +115,7 @@ function generateService(
   }
 
   const signalUtilImport =
-    hasGetsWithParams
+    hasGetsWithParams || hasMutationsWithParams
       ? `import { MaybeSignal, readSignalOrValue } from '../signal-utils';\n`
       : '';
   const modelImportLine = modelImports ? `${modelImports}\n` : '';
@@ -119,24 +143,27 @@ ${methods}
 }
 
 function generateResourceMethod(operation: OperationModel, responseTypeHints: boolean): string {
-  const hasParams = operation.pathParams.length + operation.queryParams.length > 0;
+  const hasParams =
+    operation.pathParams.length + operation.queryParams.length + operation.headerParams.length > 0;
   const paramsType = generateParamsType(operation);
   const resourceParamsType = generateResolvedParamsType(operation);
   const paramsExpression = generateResourceParamsExpression(operation);
   const pathExpression = generatePathExpression(operation);
   const queryExpression = generateQueryExpression(operation);
+  const headerExpression = generateHeaderExpression(operation);
   const paramsArg = hasParams ? `params: ${paramsType}` : '';
   const paramsFactory = hasParams
     ? `params: (): ${resourceParamsType} => (${paramsExpression}),`
     : '';
 
-  const requestLines = [
-    `method: '${operation.method.toUpperCase()}',`,
-    `path: ${pathExpression},`,
-  ];
+  const requestLines = [`method: '${operation.method.toUpperCase()}',`, `path: ${pathExpression},`];
 
   if (queryExpression) {
     requestLines.push(`query: ${queryExpression},`);
+  }
+
+  if (headerExpression) {
+    requestLines.push(`headers: ${headerExpression},`);
   }
 
   if (responseTypeHints && operation.responseParser) {
@@ -146,10 +173,14 @@ function generateResourceMethod(operation: OperationModel, responseTypeHints: bo
   requestLines.push('signal: abortSignal');
   const requestBody = requestLines.map((line) => `          ${line}`).join('\n');
 
+  const loaderSignature = hasParams
+    ? `loader: ({ params, abortSignal }: { params: ${resourceParamsType}; abortSignal: AbortSignal }) =>`
+    : `loader: ({ abortSignal }: { abortSignal: AbortSignal }) =>`;
+
   return `  ${operation.operationId}Resource(${paramsArg}) {
     return resource({
       ${paramsFactory}
-      loader: ({ params, abortSignal }: { params: ${resourceParamsType}; abortSignal: AbortSignal }) =>
+      ${loaderSignature}
         this.client.request<${operation.responseType}>({
 ${requestBody}
         })
@@ -158,7 +189,7 @@ ${requestBody}
 }
 
 function generateResolvedParamsType(operation: OperationModel): string {
-  const params = [...operation.pathParams, ...operation.queryParams];
+  const params = [...operation.pathParams, ...operation.queryParams, ...operation.headerParams];
 
   if (params.length === 0) {
     return 'undefined';
@@ -167,7 +198,8 @@ function generateResolvedParamsType(operation: OperationModel): string {
   const properties = params
     .map((param) => {
       const optional = param.required ? '' : '?';
-      return `    ${param.name}${optional}: ${param.type};`;
+      const name = formatParamName(param);
+      return `    ${name}${optional}: ${param.type};`;
     })
     .join('\n');
 
@@ -177,24 +209,41 @@ ${properties}
 }
 
 function generateMutationMethod(operation: OperationModel, responseTypeHints: boolean): string {
-  const hasParams = operation.pathParams.length + operation.queryParams.length > 0;
+  const hasParams =
+    operation.pathParams.length + operation.queryParams.length + operation.headerParams.length > 0;
   const paramsType = generateParamsType(operation);
-  const bodyParameter = operation.requestBodyType ? `body: ${operation.requestBodyType}, ` : '';
+  const bodyType = operation.requestBody?.type ?? operation.requestBodyType;
+  const bodyParameter = bodyType ? `body: ${bodyType}, ` : '';
   const paramsParameter = hasParams ? `params: ${paramsType}, ` : '';
   const pathExpression = generatePathExpression(operation);
   const queryExpression = generateQueryExpression(operation);
+  const headerExpression = generateHeaderExpression(operation);
 
-  const requestLines = [
-    `method: '${operation.method.toUpperCase()}',`,
-    `path: ${pathExpression},`,
-  ];
+  const requestLines = [`method: '${operation.method.toUpperCase()}',`, `path: ${pathExpression},`];
 
   if (queryExpression) {
     requestLines.push(`query: ${queryExpression},`);
   }
 
-  if (operation.requestBodyType) {
-    requestLines.push('body,');
+  if (headerExpression) {
+    requestLines.push(`headers: ${headerExpression},`);
+  }
+
+  if (bodyType) {
+    if (operation.requestBody?.isMultipart) {
+      // Multipart: pass body as formData; runtime builds FormData.
+      requestLines.push('formData: body,');
+    } else if (operation.requestBody?.isFormUrlencoded) {
+      // Form URL-encoded: pass body as formData; runtime builds URLSearchParams.
+      requestLines.push('formData: body,');
+    } else {
+      requestLines.push('body,');
+    }
+  }
+
+  // Emit contentType for non-JSON request bodies.
+  if (operation.requestBody && operation.requestBody.contentType !== 'application/json') {
+    requestLines.push(`contentType: ${JSON.stringify(operation.requestBody.contentType)},`);
   }
 
   if (responseTypeHints && operation.responseParser) {
@@ -212,7 +261,7 @@ ${requestBody}
 }
 
 function generateParamsType(operation: OperationModel): string {
-  const params = [...operation.pathParams, ...operation.queryParams];
+  const params = [...operation.pathParams, ...operation.queryParams, ...operation.headerParams];
 
   if (params.length === 0) {
     return 'void';
@@ -221,7 +270,8 @@ function generateParamsType(operation: OperationModel): string {
   const properties = params
     .map((param) => {
       const optional = param.required ? '' : '?';
-      return `    ${param.name}${optional}: MaybeSignal<${param.type}>;`;
+      const name = formatParamName(param);
+      return `    ${name}${optional}: MaybeSignal<${param.type}>;`;
     })
     .join('\n');
 
@@ -231,14 +281,17 @@ ${properties}
 }
 
 function generateResourceParamsExpression(operation: OperationModel): string {
-  const params = [...operation.pathParams, ...operation.queryParams];
+  const params = [...operation.pathParams, ...operation.queryParams, ...operation.headerParams];
 
   if (params.length === 0) {
     return 'undefined';
   }
 
   const properties = params
-    .map((param) => `        ${param.name}: readSignalOrValue(params.${param.name})`)
+    .map(
+      (param) =>
+        `        ${formatParamName(param)}: readSignalOrValue(${formatParamAccess(param)})`,
+    )
     .join(',\n');
 
   return `{
@@ -247,7 +300,8 @@ ${properties}
 }
 
 function generatePathExpression(operation: OperationModel): string {
-  const hasParams = [...operation.pathParams, ...operation.queryParams].length > 0;
+  const hasParams =
+    [...operation.pathParams, ...operation.queryParams, ...operation.headerParams].length > 0;
 
   if (!hasParams) {
     return `'${operation.path}'`;
@@ -261,13 +315,75 @@ function generatePathExpression(operation: OperationModel): string {
   return '`' + templatePath + '`';
 }
 
+/**
+ * Formats a parameter name for use as a TypeScript property name.
+ *
+ * Header parameters may contain hyphens (e.g. `X-Request-Id`), which are
+ * not valid in unquoted TypeScript identifiers. Such names are quoted.
+ */
+function formatParamName(param: ParameterModel): string {
+  if (param.location === 'header' && !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(param.name)) {
+    return `'${param.name}'`;
+  }
+  return param.name;
+}
+
+/**
+ * Formats a parameter name for use in a template literal expression
+ * (e.g. `params.${name}`). Header names with hyphens need bracket notation.
+ */
+function formatParamAccess(param: ParameterModel): string {
+  if (param.location === 'header' && !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(param.name)) {
+    return `params['${param.name}']`;
+  }
+  return `params.${param.name}`;
+}
+
+/**
+ * Generates the query expression for the runtime client.
+ *
+ * For parameters with non-default style/explode, wraps the value with metadata:
+ * `{ value: params.tags, style: 'spaceDelimited', explode: false }`.
+ * For default style (form + explode:true), passes the plain value for
+ * backward compatibility.
+ */
 function generateQueryExpression(operation: OperationModel): string {
   if (operation.queryParams.length === 0) {
     return '';
   }
 
   const properties = operation.queryParams
-    .map((param) => `            ${param.name}: params.${param.name}`)
+    .map((param) => {
+      const isDefaultStyle =
+        (!param.style || param.style === DEFAULT_QUERY_STYLE) &&
+        (param.explode === undefined || param.explode === DEFAULT_QUERY_EXPLODE);
+
+      if (isDefaultStyle) {
+        return `            ${param.name}: ${formatParamAccess(param)}`;
+      }
+
+      const style = param.style ?? DEFAULT_QUERY_STYLE;
+      const explode = param.explode ?? DEFAULT_QUERY_EXPLODE;
+      return `            ${param.name}: { value: ${formatParamAccess(param)}, style: '${style}', explode: ${explode} }`;
+    })
+    .join(',\n');
+
+  return `{
+${properties}
+          }`;
+}
+
+/**
+ * Generates a headers object expression for header parameters.
+ * Returns empty string if there are no header parameters.
+ */
+function generateHeaderExpression(operation: OperationModel): string {
+  if (operation.headerParams.length === 0) {
+    return '';
+  }
+
+  const properties = operation.headerParams
+    .map((param) => `            '${param.name}': ${formatParamAccess(param)}`)
     .join(',\n');
 
   return `{
@@ -276,23 +392,29 @@ ${properties}
 }
 
 function toParameterModel(parameter: any): ParameterModel {
+  const style = parameter.style as QueryStyle | undefined;
+  const explode = parameter.explode as boolean | undefined;
+
   return {
     name: parameter.name,
     location: parameter.in,
     required: Boolean(parameter.required),
     type: schemaToTsType(parameter.schema),
+    // Only emit style/explode for query params with non-default values.
+    ...(style && style !== DEFAULT_QUERY_STYLE ? {style} : {}),
+    ...(explode !== undefined && explode !== DEFAULT_QUERY_EXPLODE ? {explode} : {}),
   };
 }
 
 function extractResponseType(operation: any): {
   responseType: string;
-  responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer';
+  responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
 } {
   const responses = operation.responses ?? {};
 
   // Collect all 2xx response schemas (including 2XX range from OpenAPI 3.1).
   const successSchemas: string[] = [];
-  let responseParser: 'json' | 'text' | 'blob' | 'arrayBuffer' | undefined;
+  let responseParser: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream' | undefined;
 
   for (const [statusCode, response] of Object.entries(responses)) {
     if (!isSuccessStatus(statusCode)) {
@@ -332,9 +454,13 @@ function extractResponseType(operation: any): {
 /** Maps an HTTP content-type to a runtime response parser hint. */
 function parserForContentType(
   contentType: string,
-): 'json' | 'text' | 'blob' | 'arrayBuffer' | undefined {
+): 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream' | undefined {
   if (contentType.includes('application/json') || contentType.includes('+json')) {
     return 'json';
+  }
+
+  if (contentType === 'text/event-stream') {
+    return 'stream';
   }
 
   if (contentType.startsWith('text/')) {
@@ -406,20 +532,62 @@ function extractSchemaFromResponse(response: any): {
   return {schema: schemaToTsType(schema), contentType};
 }
 
-function extractRequestBodyType(operation: any): string | undefined {
+/**
+ * Extracts the request body model from an OpenAPI operation.
+ *
+ * Selects the primary content type with preference for `application/json`.
+ * Detects `multipart/form-data` and `application/x-www-form-urlencoded` and
+ * captures part schemas for multipart bodies.
+ */
+function extractRequestBody(operation: any): RequestBodyModel | undefined {
   const content = operation.requestBody?.content;
   if (!content) {
     return undefined;
   }
 
-  const jsonContent = content['application/json'] ?? Object.values(content).find((c: any) => c?.schema) as any | undefined;
-  const schema = jsonContent?.schema;
+  const entries = Object.entries(content) as [string, any][];
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  // Select the primary content type: prefer application/json, then the
+  // first entry with a schema.
+  const jsonEntry = entries.find(([type]) => type === 'application/json');
+  const firstWithSchema = entries.find(([, c]) => c?.schema);
+  const chosen = jsonEntry ?? firstWithSchema;
+
+  if (!chosen) {
+    return undefined;
+  }
+
+  const [contentType, contentObj] = chosen;
+  const schema = contentObj?.schema;
 
   if (!schema) {
     return undefined;
   }
 
-  return schemaToTsType(schema);
+  const isMultipart = contentType === 'multipart/form-data';
+  const isFormUrlencoded = contentType === 'application/x-www-form-urlencoded';
+
+  let parts: MultipartPartModel[] | undefined;
+
+  if (isMultipart && schema.type === 'object' && schema.properties) {
+    const required = new Set<string>(schema.required ?? []);
+    parts = Object.entries(schema.properties).map(([name, propSchema]: [string, any]) => ({
+      name,
+      type: schemaToTsType(propSchema),
+      required: required.has(name),
+    }));
+  }
+
+  return {
+    type: schemaToTsType(schema),
+    contentType,
+    isMultipart,
+    isFormUrlencoded,
+    ...(parts ? {parts} : {}),
+  };
 }
 
 function groupByTag(operations: OperationModel[]): Record<string, OperationModel[]> {
@@ -486,11 +654,16 @@ function collectModelImports(operations: OperationModel[]): string {
   for (const operation of operations) {
     collectType(operation.responseType, types);
 
-    if (operation.requestBodyType) {
-      collectType(operation.requestBodyType, types);
+    const bodyType = operation.requestBody?.type ?? operation.requestBodyType;
+    if (bodyType) {
+      collectType(bodyType, types);
     }
 
-    for (const param of [...operation.pathParams, ...operation.queryParams]) {
+    for (const param of [
+      ...operation.pathParams,
+      ...operation.queryParams,
+      ...operation.headerParams,
+    ]) {
       collectType(param.type, types);
     }
   }

@@ -61,14 +61,22 @@ function httpError(
   };
 }
 
+interface QueryParamOptions {
+  value: unknown;
+  style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+  explode: boolean;
+}
+
 interface ApiRequestOptions {
   method: string;
   path: string;
-  query?: Record<string, unknown>;
+  query?: Record<string, unknown | QueryParamOptions>;
   headers?: Record<string, string>;
   body?: unknown;
+  formData?: Record<string, unknown>;
+  contentType?: string;
   signal?: AbortSignal;
-  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer';
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
 }
 
 interface ApiRequestContext {
@@ -100,20 +108,56 @@ interface ClientDeps {
   http: {request: (...args: any[]) => any};
 }
 
-function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown>): string {
-  const url = new URL(path, baseUrl);
-
-  for (const [key, value] of Object.entries(query ?? {})) {
-    if (value === undefined || value === null) {
-      continue;
-    }
-
-    if (Array.isArray(value)) {
+function appendQueryParam(
+  url: URL,
+  key: string,
+  value: unknown,
+  style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject',
+  explode: boolean,
+): void {
+  if (Array.isArray(value)) {
+    if (explode) {
       for (const item of value) {
         url.searchParams.append(key, String(item));
       }
     } else {
-      url.searchParams.set(key, String(value));
+      const sep = style === 'spaceDelimited' ? ' ' : style === 'pipeDelimited' ? '|' : ',';
+      url.searchParams.set(key, value.map((v) => String(v)).join(sep));
+    }
+  } else if (typeof value === 'object' && value !== null && style === 'deepObject' && explode) {
+    for (const [prop, val] of Object.entries(value)) {
+      if (val !== undefined && val !== null) {
+        url.searchParams.append(`${key}[${prop}]`, String(val));
+      }
+    }
+  } else {
+    url.searchParams.set(key, String(value));
+  }
+}
+
+function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown | QueryParamOptions>): string {
+  const url = new URL(path, baseUrl);
+
+  for (const [key, raw] of Object.entries(query ?? {})) {
+    if (raw === undefined || raw === null) {
+      continue;
+    }
+
+    const isWrapped =
+      typeof raw === 'object' &&
+      raw !== null &&
+      !Array.isArray(raw) &&
+      'value' in raw &&
+      'style' in raw;
+
+    if (isWrapped) {
+      const opts = raw as QueryParamOptions;
+      if (opts.value === undefined || opts.value === null) {
+        continue;
+      }
+      appendQueryParam(url, key, opts.value, opts.style, opts.explode);
+    } else {
+      appendQueryParam(url, key, raw, 'form', true);
     }
   }
 
@@ -121,7 +165,7 @@ function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown>
 }
 
 function mapResponseType(
-  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer',
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream',
 ): 'json' | 'text' | 'blob' | 'arraybuffer' | undefined {
   if (!responseType) {
     return undefined;
@@ -129,6 +173,8 @@ function mapResponseType(
   switch (responseType) {
     case 'arrayBuffer':
       return 'arraybuffer';
+    case 'stream':
+      return 'blob';
     default:
       return responseType;
   }
@@ -143,6 +189,46 @@ function toApiErrorFromHttpErrorResponse(error: HttpErrorResponseStub): ApiError
   };
 }
 
+function prepareBody(options: ApiRequestOptions): { body: unknown; contentType?: string } {
+  if (options.formData !== undefined) {
+    if (options.contentType === 'application/x-www-form-urlencoded') {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(options.formData)) {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      }
+      return {body: params.toString(), contentType: 'application/x-www-form-urlencoded'};
+    }
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(options.formData)) {
+      if (value === undefined || value === null) {
+        continue;
+      }
+      if (value instanceof Blob) {
+        formData.append(key, value);
+      } else {
+        formData.append(key, String(value));
+      }
+    }
+    return {body: formData};
+  }
+
+  if (options.body !== undefined) {
+    if (
+      options.body instanceof FormData ||
+      options.body instanceof Blob ||
+      options.body instanceof ArrayBuffer ||
+      options.body instanceof URLSearchParams
+    ) {
+      return {body: options.body, contentType: options.contentType};
+    }
+    return {body: options.body, contentType: options.contentType ?? 'application/json'};
+  }
+
+  return {body: undefined};
+}
+
 function createClient(deps: ClientDeps) {
   const defaultHeaders = deps.defaultHeaders ?? {};
   const errorMapper = deps.errorMapper ?? toApiErrorFromHttpErrorResponse;
@@ -152,11 +238,13 @@ function createClient(deps: ClientDeps) {
 
     const authHeaders = deps.auth ? await deps.auth() : {};
 
+    const {body, contentType} = prepareBody(options);
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...defaultHeaders,
       ...authHeaders,
-      ...(options.body !== undefined ? {'Content-Type': 'application/json'} : {}),
+      ...(contentType ? {'Content-Type': contentType} : {}),
       ...options.headers,
     };
 
@@ -164,7 +252,7 @@ function createClient(deps: ClientDeps) {
       url,
       method: options.method,
       headers,
-      body: options.body,
+      body,
     };
 
     if (deps.onRequest) {
@@ -486,6 +574,94 @@ describe('ApiHttpClient request logic', () => {
       const callArgs = (http.request as any).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).toHaveProperty('X-Hook', 'yes');
+    });
+  });
+
+  describe('query parameter styles', () => {
+    it('serializes spaceDelimited with explode:false as space-separated', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        tags: {value: ['a', 'b'], style: 'spaceDelimited', explode: false},
+      });
+      // URLSearchParams encodes spaces as +
+      expect(url).toContain('tags=a+b');
+    });
+
+    it('serializes pipeDelimited with explode:false as pipe-separated', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        categories: {value: ['x', 'y'], style: 'pipeDelimited', explode: false},
+      });
+      expect(url).toContain('categories=x%7Cy');
+    });
+
+    it('serializes deepObject with explode:true as nested keys', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        filters: {value: {status: 'active', role: 'admin'}, style: 'deepObject', explode: true},
+      });
+      expect(url).toContain('filters%5Bstatus%5D=active');
+      expect(url).toContain('filters%5Brole%5D=admin');
+    });
+  });
+
+  describe('FormData and binary body handling', () => {
+    it('builds FormData from formData object for multipart', async () => {
+      const response = httpResponse({url: 'ok'}, 200);
+      const http = mockHttp(response);
+      const client = createClient({baseUrl, http});
+
+      const blob = new Blob(['file-content'], {type: 'image/png'});
+      await client.request({
+        method: 'POST',
+        path: '/upload',
+        formData: {file: blob, caption: 'test'},
+        contentType: 'multipart/form-data',
+      });
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.body).toBeInstanceOf(FormData);
+    });
+
+    it('builds URLSearchParams for application/x-www-form-urlencoded', async () => {
+      const response = httpResponse({created: 1}, 200);
+      const http = mockHttp(response);
+      const client = createClient({baseUrl, http});
+
+      await client.request({
+        method: 'POST',
+        path: '/bulk',
+        formData: {names: 'a,b', count: 1},
+        contentType: 'application/x-www-form-urlencoded',
+      });
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.body).toBe('names=a%2Cb&count=1');
+      expect(opts.headers).toHaveProperty('Content-Type', 'application/x-www-form-urlencoded');
+    });
+
+    it('passes Blob body through without JSON serialization', async () => {
+      const response = httpResponse({}, 200);
+      const http = mockHttp(response);
+      const client = createClient({baseUrl, http});
+
+      const blob = new Blob(['binary'], {type: 'application/octet-stream'});
+      await client.request({
+        method: 'POST',
+        path: '/upload',
+        body: blob,
+        contentType: 'application/octet-stream',
+      });
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.body).toBe(blob);
+      expect(opts.headers).toHaveProperty('Content-Type', 'application/octet-stream');
+    });
+  });
+
+  describe('stream responseType mapping', () => {
+    it('maps stream to blob (Angular HttpClient has no native stream)', () => {
+      expect(mapResponseType('stream')).toBe('blob');
     });
   });
 });

@@ -14,8 +14,14 @@ GET endpoints are generated as Angular `resource()` APIs, while mutating endpoin
 - Typed models generated from OpenAPI schemas
 - Path parameter support
 - Query parameter support
+- Advanced query parameter serialization (OpenAPI `style`/`explode`: `form`, `spaceDelimited`, `pipeDelimited`, `deepObject`)
+- Header parameter support
 - JSON request body support
-- JSON, text, `Blob` and `ArrayBuffer` response handling
+- Multipart form data (`multipart/form-data`) and file upload support
+- `application/x-www-form-urlencoded` request body support
+- Custom request content types
+- JSON, text, `Blob`, `ArrayBuffer` and `ReadableStream` response handling
+- File download support
 - Fetch middleware (onion-style `(request, next) => response`)
 - Auth header hooks
 - Custom default headers
@@ -166,6 +172,9 @@ ng-openapi-signals generate --input <openapi-file> --output <output-directory>
 | `--no-clean`                      | Preserve existing files in output directory                   |
 | `--group-by <tag\|path>`          | Group APIs by tag or path (default: tag)                      |
 | `--transport <fetch\|httpClient>` | HTTP transport (default: fetch)                               |
+| `--default-query-style <style>`   | Default query param style: form, spaceDelimited, pipeDelimited, or deepObject |
+| `--default-query-explode <bool>` | Default query param explode (true/false)                      |
+| `--prefer-content-type <type>`   | Preferred request content type when multiple are offered       |
 
 ### Recommended: use a config file
 
@@ -281,11 +290,14 @@ providers.ts
 
 #### `runtime`
 
-| Option              | Type                      | Default   | Description                                                                |
-| ------------------- | ------------------------- | --------- | -------------------------------------------------------------------------- |
-| `transport`         | `'fetch' \| 'httpClient'` | `'fetch'` | HTTP transport (`fetch` = native fetch, `httpClient` = Angular HttpClient) |
-| `defaultHeaders`    | `Record<string, string>`  | `{}`      | Static default headers baked into `provideNgOpenapiSignals` defaults       |
-| `responseTypeHints` | `boolean`                 | `true`    | Emit `responseType` hints in generated methods based on response content   |
+| Option              | Type                      | Default     | Description                                                                |
+| ------------------- | ------------------------- | ----------- | -------------------------------------------------------------------------- |
+| `transport`         | `'fetch' \| 'httpClient'` | `'fetch'`   | HTTP transport (`fetch` = native fetch, `httpClient` = Angular HttpClient) |
+| `defaultHeaders`    | `Record<string, string>`  | `{}`        | Static default headers baked into `provideNgOpenapiSignals` defaults       |
+| `responseTypeHints` | `boolean`                 | `true`      | Emit `responseType` hints in generated methods based on response content   |
+| `defaultQueryStyle` | `'form' \| 'spaceDelimited' \| 'pipeDelimited' \| 'deepObject'` | `'form'` | Default query param serialization style when the spec doesn't specify `style` |
+| `defaultQueryExplode` | `boolean`               | `true`      | Default `explode` flag for query params when the spec doesn't specify it  |
+| `preferContentType` | `string`                  | `'application/json'` | Preferred content type when a request body offers multiple media types  |
 
 ### Using the `httpClient` transport
 
@@ -337,6 +349,62 @@ export default defineConfig({
   clean: false,
 });
 ```
+
+---
+
+## Advanced Request Support
+
+### Query Parameter Serialization
+
+The generator supports OpenAPI parameter `style` and `explode` for query parameters:
+
+| Style             | `explode: true`              | `explode: false`              |
+| ----------------- | ---------------------------- | ------------------------------ |
+| `form` (default)  | `tags=a&tags=b` (repeated)    | `tags=a,b` (comma-separated)   |
+| `spaceDelimited`  | `tags=a&tags=b` (repeated)    | `tags=a b` (space-separated)   |
+| `pipeDelimited`   | `tags=a&tags=b` (repeated)    | `tags=a\|b` (pipe-separated)    |
+| `deepObject`      | `filters[status]=active`     | —                              |
+
+Parameters with default style (`form` + `explode: true`) are passed as plain values for backward compatibility.
+Non-default styles are wrapped with metadata: `{ value: params.tags, style: 'spaceDelimited', explode: false }`.
+
+### Multipart Form Data and File Upload
+
+When a request body uses `multipart/form-data`, the generator emits `formData: body` instead of `body:`.
+The runtime builds a `FormData` object from the typed input. Binary parts (`format: binary`) are typed as `Blob`.
+
+```ts
+// OpenAPI: multipart/form-data with file + caption
+await this.usersApi.uploadUserAvatar(
+  { file: blob, caption: 'Profile photo' },
+  { id: 'usr_123' },
+);
+```
+
+The runtime automatically:
+- Builds `FormData` from the typed object
+- Appends `Blob` values directly (no JSON serialization)
+- Lets the browser set the `Content-Type` with the multipart boundary
+
+### `application/x-www-form-urlencoded`
+
+For URL-encoded form bodies, the runtime builds `URLSearchParams` from the typed object.
+
+### Custom Content Types
+
+When a request body uses a non-JSON content type (e.g. `application/octet-stream`),
+the generator emits a `contentType` field. The runtime passes `Blob`/`ArrayBuffer` bodies
+through without JSON serialization.
+
+### File Download and Stream Responses
+
+Binary responses (`image/*`, `application/octet-stream`, etc.) are handled as `Blob` or `ArrayBuffer`.
+`text/event-stream` responses are handled as `ReadableStream` (fetch transport) or `Blob` (httpClient transport).
+
+### Header Parameters
+
+Header parameters (`in: header`) are generated as method arguments and merged into the request `headers` object.
+Header names with hyphens (e.g. `X-Request-Id`) are properly quoted in TypeScript.
 
 ---
 

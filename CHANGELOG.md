@@ -7,6 +7,49 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Advanced query parameter serialization**: OpenAPI parameter `style` and `explode` are now supported for query parameters. The generated code wraps non-default style params with metadata (`{ value, style, explode }`) and the runtime `buildUrl` serializes them according to the OpenAPI specification. Supported styles: `form` (default), `spaceDelimited`, `pipeDelimited`, `deepObject`, with `explode: true/false` variants.
+- **Header parameter support**: OpenAPI parameters with `in: header` are now generated as method arguments and merged into the request `headers` object. Header names with hyphens (e.g. `X-Request-Id`) are properly quoted in TypeScript property names and use bracket notation for access.
+- **Multipart form data support**: Request bodies with `multipart/form-data` content type are now supported. The generator emits `formData: body` instead of `body:`, and the runtime builds a `FormData` object from the typed input. `Blob` values (binary parts) are appended directly without JSON serialization. The browser sets the `Content-Type` with the multipart boundary automatically.
+- **`application/x-www-form-urlencoded` support**: Request bodies with `application/x-www-form-urlencoded` content type are serialized as `URLSearchParams` by the runtime.
+- **File upload support**: Binary request body parts (`format: binary`) are typed as `Blob` and passed through without JSON serialization. Custom content types (e.g. `application/octet-stream`) are supported via the `contentType` field in `ApiRequestOptions`.
+- **File download and stream support**: `text/event-stream` responses now map to `responseType: 'stream'`. The fetch transport returns `response.body` (`ReadableStream`); the httpClient transport maps `'stream'` to `'blob'` (Angular `HttpClient` has no native stream — call `.stream()` on the returned `Blob`).
+- **Custom content types**: The generator emits a `contentType` field in `ApiRequestOptions` for non-JSON request bodies. The runtime uses this to set the `Content-Type` header and skips `JSON.stringify` for `FormData`, `Blob`, `ArrayBuffer`, and `URLSearchParams` bodies.
+- **`RequestBodyModel` and `MultipartPartModel` types**: New types in `codegen/types.ts` capture request body content type, multipart metadata, and part schemas.
+- **`QueryStyle` type**: New type in `codegen/types.ts` for OpenAPI parameter serialization styles.
+- **`QueryParamOptions` interface**: Generated runtime interface for wrapping query param values with style/explode metadata.
+- **Config options**: `RuntimeConfig` extended with `defaultQueryStyle` (default `'form'`), `defaultQueryExplode` (default `true`), and `preferContentType` (default `'application/json'`).
+- **CLI flags**: `--default-query-style`, `--default-query-explode`, `--prefer-content-type` added to the CLI.
+- **`isQueryStyle` type guard**: Exported from `config.ts` for validating the `defaultQueryStyle` option.
+- **Test fixtures**: Added `tests/fixtures/query-styles.yml`, `tests/fixtures/multipart-upload.yml`, `tests/fixtures/header-params.yml`, `tests/fixtures/stream-download.yml`.
+- **Tests**: Added `tests/query-styles.test.ts`, `tests/multipart.test.ts`, `tests/header-params.test.ts`, `tests/stream-download.test.ts`. Extended `tests/api-fetch-client.test.ts` and `tests/api-http-client.test.ts` with query style serialization, FormData/Blob body handling, and stream response tests. Extended `tests/config.test.ts` with new runtime config tests and `isQueryStyle` guard.
+- **Example endpoints**: Added `searchUsersByTags` (spaceDelimited query + header param), `uploadUserAvatar` (multipart upload), `getUserEvents` (SSE stream) to `examples/openapi.json` and `examples/openapi.yml`.
+
+### Changed
+
+- `ParameterModel.location` type extended from `'path' | 'query'` to `'path' | 'query' | 'header'`. Cookie parameters are intentionally not supported.
+- `ParameterModel` now includes optional `style` and `explode` fields.
+- `OperationModel` now includes `headerParams`, `requestBody` (`RequestBodyModel`), and `responseParser` supports `'stream'`. The `requestBodyType` field is kept for backward compatibility.
+- `extractRequestBody` replaces `extractRequestBodyType` in `generate-api.ts`, returning a `RequestBodyModel` with content type and multipart metadata.
+- `toParameterModel` in `generate-api.ts` now parses `style` and `explode` from the OpenAPI parameter object.
+- `generateQueryExpression` wraps non-default style params with `{ value, style, explode }` metadata; default style params remain plain values for backward compatibility.
+- `generateMutationMethod` emits `formData: body` and `contentType:` for multipart/formUrlencoded request bodies.
+- `generateResourceMethod` and `generateMutationMethod` now include header parameters in the params type and generate a `headers` object expression.
+- `parserForContentType` in `generate-api.ts` now checks `text/event-stream` before the `text/` prefix to map to `'stream'`.
+- `ApiRequestOptions` (both transports) extended with `formData`, `contentType`, and `'stream'` responseType.
+- `buildUrl` (both `ApiFetchClient` and `ApiHttpClient`) rewritten to support OpenAPI style/explode serialization via `appendQueryParam` method.
+- `ApiFetchClient.request` and `ApiHttpClient.request` now use `prepareBody` to handle `FormData`, `Blob`, `ArrayBuffer`, `URLSearchParams`, and custom content types.
+- `ApiHttpClient.mapResponseType` now maps `'stream'` to `'blob'`.
+- `DEFAULT_RUNTIME_CONFIG` extended with `defaultQueryStyle`, `defaultQueryExplode`, `preferContentType`.
+- `mergeRuntime` and `validateConfig` in `config.ts` handle the new runtime config fields.
+
+### Backwards Compatibility
+
+- Without any new configuration, the generated runtime behaves identically to 0.6.x: query params use default `form` + `explode: true` (plain values, no metadata wrapper), request bodies are JSON-serialized with `Content-Type: application/json`, and no `formData`/`contentType` fields are emitted.
+- Existing OpenAPI specs without `style`/`explode` on parameters, without `multipart/form-data` request bodies, and without header parameters produce identical generated output.
+- The `requestBodyType` field on `OperationModel` is kept for backward compatibility (delegates to `requestBody.type`).
+
 ## [0.6.2] - 2026-07-06
 
 ### Changed

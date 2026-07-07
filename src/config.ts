@@ -7,6 +7,7 @@ import type {
   GroupBy,
   HttpTransport,
   PartialGeneratorConfig,
+  QueryStyle,
   RuntimeConfig,
 } from './codegen/types';
 
@@ -14,6 +15,9 @@ export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   transport: 'fetch',
   defaultHeaders: {},
   responseTypeHints: true,
+  defaultQueryStyle: 'form',
+  defaultQueryExplode: true,
+  preferContentType: 'application/json',
 };
 
 export const DEFAULT_CONFIG: GeneratorConfig = {
@@ -96,6 +100,9 @@ function mergeRuntime(
     transport: 'fetch',
     defaultHeaders: {},
     responseTypeHints: true,
+    defaultQueryStyle: 'form',
+    defaultQueryExplode: true,
+    preferContentType: 'application/json',
   };
 
   for (const layer of layers) {
@@ -116,6 +123,18 @@ function mergeRuntime(
 
     if (layer.responseTypeHints !== undefined) {
       result.responseTypeHints = layer.responseTypeHints;
+    }
+
+    if (layer.defaultQueryStyle !== undefined) {
+      result.defaultQueryStyle = layer.defaultQueryStyle;
+    }
+
+    if (layer.defaultQueryExplode !== undefined) {
+      result.defaultQueryExplode = layer.defaultQueryExplode;
+    }
+
+    if (layer.preferContentType !== undefined) {
+      result.preferContentType = layer.preferContentType;
     }
   }
 
@@ -184,6 +203,33 @@ export function validateConfig(config: GeneratorConfig): void {
       `Invalid runtime.transport: '${runtime.transport}'. Must be 'fetch' or 'httpClient'.`,
     );
   }
+
+  if (
+    runtime?.defaultQueryStyle !== undefined &&
+    !isQueryStyle(runtime.defaultQueryStyle)
+  ) {
+    throw new Error(
+      `Invalid runtime.defaultQueryStyle: '${runtime.defaultQueryStyle}'. Must be 'form', 'spaceDelimited', 'pipeDelimited', or 'deepObject'.`,
+    );
+  }
+
+  if (
+    runtime?.defaultQueryExplode !== undefined &&
+    typeof runtime.defaultQueryExplode !== 'boolean'
+  ) {
+    throw new Error(
+      'Invalid runtime.defaultQueryExplode: must be a boolean.',
+    );
+  }
+
+  if (
+    runtime?.preferContentType !== undefined &&
+    typeof runtime.preferContentType !== 'string'
+  ) {
+    throw new Error(
+      'Invalid runtime.preferContentType: must be a string.',
+    );
+  }
 }
 
 /**
@@ -198,4 +244,11 @@ export function isGroupBy(value: unknown): value is GroupBy {
  */
 export function isTransport(value: unknown): value is HttpTransport {
   return value === 'fetch' || value === 'httpClient';
+}
+
+/**
+ * Type guard for the `QueryStyle` union.
+ */
+export function isQueryStyle(value: unknown): value is QueryStyle {
+  return value === 'form' || value === 'spaceDelimited' || value === 'pipeDelimited' || value === 'deepObject';
 }

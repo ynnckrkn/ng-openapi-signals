@@ -1,0 +1,28 @@
+openapi: 3.0.3
+info:
+  title: Stream Download Fixture
+  version: 1.0.0
+paths:
+  /events:
+    get:
+      operationId: getEvents
+      tags: [Stream]
+      responses:
+        "200":
+          description: Server-Sent Events stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /download:
+    get:
+      operationId: downloadFile
+      tags: [Stream]
+      responses:
+        "200":
+          description: Binary file download.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary

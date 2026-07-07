@@ -12,6 +12,17 @@ export type GroupBy = 'tag' | 'path';
 export type HttpTransport = 'fetch' | 'httpClient';
 
 /**
+ * OpenAPI parameter serialization styles for query parameters.
+ *
+ * - `'form'` (default): comma-separated when `explode: false`,
+ *   repeated keys when `explode: true`.
+ * - `'spaceDelimited'`: space-separated (`%20`).
+ * - `'pipeDelimited'`: pipe-separated (`|`).
+ * - `'deepObject'`: nested key notation (`key[prop]=value`).
+ */
+export type QueryStyle = 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+
+/**
  * Runtime-related generator options.
  *
  * These influence the generated runtime files (providers, fetch client).
@@ -37,11 +48,29 @@ export interface RuntimeConfig {
   defaultHeaders?: Record<string, string>;
   /**
    * When `true` (default), generated API methods emit a `responseType`
-   * hint (`'json' | 'text' | 'blob' | 'arrayBuffer'`) derived from the
+   * hint (`'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream'`) derived from the
    * OpenAPI response `content` type. Set to `false` to rely solely on
    * runtime content-type sniffing.
    */
   responseTypeHints?: boolean;
+  /**
+   * Default query parameter serialization style when the OpenAPI spec does
+   * not specify `style`. Defaults to `'form'` (the OpenAPI default for
+   * query parameters).
+   */
+  defaultQueryStyle?: QueryStyle;
+  /**
+   * Default `explode` flag for query parameters when the OpenAPI spec does
+   * not specify `explode`. Defaults to `true` (the OpenAPI default for
+   * `form` style query parameters).
+   */
+  defaultQueryExplode?: boolean;
+  /**
+   * Preferred content type when a request body offers multiple media types.
+   * Defaults to `'application/json'`. Set to e.g. `'multipart/form-data'`
+   * to prefer multipart when available.
+   */
+  preferContentType?: string;
 }
 
 export interface GeneratorConfig {
@@ -64,9 +93,34 @@ export interface GenerateOptions {
 
 export interface ParameterModel {
   name: string;
-  location: 'path' | 'query';
+  location: 'path' | 'query' | 'header';
   required: boolean;
   type: string;
+  /** OpenAPI `style` for query parameters. Defaults to `'form'`. */
+  style?: QueryStyle;
+  /** OpenAPI `explode` flag. Defaults to `true` for `form` style. */
+  explode?: boolean;
+}
+
+/** A single part of a multipart form-data request body. */
+export interface MultipartPartModel {
+  name: string;
+  type: string;
+  required: boolean;
+}
+
+/** Request body model capturing content type, TS type, and multipart metadata. */
+export interface RequestBodyModel {
+  /** The TypeScript type string for the request body (e.g. `CreateUserRequest`). */
+  type: string;
+  /** The primary content type (e.g. `application/json`, `multipart/form-data`). */
+  contentType: string;
+  /** True when the content type is `multipart/form-data`. */
+  isMultipart: boolean;
+  /** True when the content type is `application/x-www-form-urlencoded`. */
+  isFormUrlencoded: boolean;
+  /** Multipart parts when `isMultipart` is true. */
+  parts?: MultipartPartModel[];
 }
 
 export interface OperationModel {
@@ -76,9 +130,13 @@ export interface OperationModel {
   path: string;
   pathParams: ParameterModel[];
   queryParams: ParameterModel[];
+  headerParams: ParameterModel[];
   responseType: string;
   /** Parser hint derived from the success response content type. */
-  responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer';
+  responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
+  /** Request body metadata (content type, multipart info). */
+  requestBody?: RequestBodyModel;
+  /** @deprecated Use `requestBody.type` instead. Kept for backward compatibility. */
   requestBodyType?: string;
 }
 

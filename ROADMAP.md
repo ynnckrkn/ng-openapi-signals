@@ -60,12 +60,12 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 
 ## 0.7.x - Advanced Request Support
 
-- Add advanced query parameter serialization.
-- Support OpenAPI parameter styles.
-- Add multipart form data support.
-- Add file upload support.
-- Add file download support.
-- Add support for custom content types.
+- [x] Add advanced query parameter serialization.
+- [x] Support OpenAPI parameter styles.
+- [x] Add multipart form data support.
+- [x] Add file upload support.
+- [x] Add file download support.
+- [x] Add support for custom content types.
 
 ## 0.8.x - Developer Experience
 

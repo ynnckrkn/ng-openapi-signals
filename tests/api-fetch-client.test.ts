@@ -3,14 +3,22 @@ import {describe, it, expect, vi, afterEach} from 'vitest';
 // Tests mirror the generated api-fetch-client.ts template logic without Angular DI.
 // Dependencies that would be injected are passed explicitly to `createClient`.
 
+interface QueryParamOptions {
+  value: unknown;
+  style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+  explode: boolean;
+}
+
 interface ApiRequestOptions {
   method: string;
   path: string;
-  query?: Record<string, unknown>;
+  query?: Record<string, unknown | QueryParamOptions>;
   headers?: Record<string, string>;
   body?: unknown;
+  formData?: Record<string, unknown>;
+  contentType?: string;
   signal?: AbortSignal;
-  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer';
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
 }
 
 interface ApiRequestContext {
@@ -38,21 +46,56 @@ interface ClientDeps {
   fetchFn: typeof fetch;
 }
 
-function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown>): string {
+function appendQueryParam(
+  url: URL,
+  key: string,
+  value: unknown,
+  style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject',
+  explode: boolean,
+): void {
+  if (Array.isArray(value)) {
+    if (explode) {
+      for (const item of value) {
+        url.searchParams.append(key, String(item));
+      }
+    } else {
+      const sep = style === 'spaceDelimited' ? ' ' : style === 'pipeDelimited' ? '|' : ',';
+      url.searchParams.set(key, value.map((v) => String(v)).join(sep));
+    }
+  } else if (typeof value === 'object' && value !== null && style === 'deepObject' && explode) {
+    for (const [prop, val] of Object.entries(value)) {
+      if (val !== undefined && val !== null) {
+        url.searchParams.append(`${key}[${prop}]`, String(val));
+      }
+    }
+  } else {
+    url.searchParams.set(key, String(value));
+  }
+}
+
+function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown | QueryParamOptions>): string {
   const url = new URL(path, baseUrl);
 
-  for (const [key, value] of Object.entries(query ?? {})) {
-    if (value === undefined || value === null) {
+  for (const [key, raw] of Object.entries(query ?? {})) {
+    if (raw === undefined || raw === null) {
       continue;
     }
 
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        url.searchParams.append(key, String(item));
-        void item;
+    const isWrapped =
+      typeof raw === 'object' &&
+      raw !== null &&
+      !Array.isArray(raw) &&
+      'value' in raw &&
+      'style' in raw;
+
+    if (isWrapped) {
+      const opts = raw as QueryParamOptions;
+      if (opts.value === undefined || opts.value === null) {
+        continue;
       }
+      appendQueryParam(url, key, opts.value, opts.style, opts.explode);
     } else {
-      url.searchParams.set(key, String(value));
+      appendQueryParam(url, key, raw, 'form', true);
     }
   }
 
@@ -61,7 +104,7 @@ function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown>
 
 async function parseBody(
   response: Response,
-  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer',
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream',
 ): Promise<unknown> {
   if (responseType) {
     switch (responseType) {
@@ -73,6 +116,8 @@ async function parseBody(
         return response.blob();
       case 'arrayBuffer':
         return response.arrayBuffer();
+      case 'stream':
+        return response.body;
     }
   }
 
@@ -93,6 +138,47 @@ async function parseBody(
   return response.blob();
 }
 
+function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; contentType?: string } {
+  if (options.formData !== undefined) {
+    if (options.contentType === 'application/x-www-form-urlencoded') {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(options.formData)) {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      }
+      return {body: params.toString(), contentType: 'application/x-www-form-urlencoded'};
+    }
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(options.formData)) {
+      if (value === undefined || value === null) {
+        continue;
+      }
+      if (value instanceof Blob) {
+        formData.append(key, value);
+      } else {
+        formData.append(key, String(value));
+      }
+    }
+    return {body: formData};
+  }
+
+  if (options.body !== undefined) {
+    if (
+      options.body instanceof FormData ||
+      options.body instanceof Blob ||
+      options.body instanceof ArrayBuffer ||
+      options.body instanceof URLSearchParams ||
+      (typeof ReadableStream !== 'undefined' && options.body instanceof ReadableStream)
+    ) {
+      return {body: options.body as BodyInit, contentType: options.contentType};
+    }
+    return {body: JSON.stringify(options.body), contentType: options.contentType ?? 'application/json'};
+  }
+
+  return {body: undefined};
+}
+
 function createClient(deps: ClientDeps) {
   const middleware = deps.middleware ?? [];
   const defaultHeaders = deps.defaultHeaders ?? {};
@@ -102,11 +188,13 @@ function createClient(deps: ClientDeps) {
 
     const authHeaders = deps.auth ? await deps.auth() : {};
 
+    const {body, contentType} = prepareBody(options);
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...defaultHeaders,
       ...authHeaders,
-      ...(options.body !== undefined ? {'Content-Type': 'application/json'} : {}),
+      ...(contentType ? {'Content-Type': contentType} : {}),
       ...options.headers,
     };
 
@@ -114,7 +202,7 @@ function createClient(deps: ClientDeps) {
       method: options.method,
       ...(options.signal !== undefined ? {signal: options.signal} : {}),
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      ...(body !== undefined ? {body} : {}),
     };
 
     const context: ApiRequestContext = {url, init};
@@ -635,6 +723,165 @@ describe('ApiFetchClient request logic', () => {
       const callArgs = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('X-Hook', 'yes');
+    });
+  });
+
+  describe('query parameter styles', () => {
+    it('serializes spaceDelimited with explode:false as space-separated', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        tags: {value: ['a', 'b'], style: 'spaceDelimited', explode: false},
+      });
+      // URLSearchParams encodes spaces as +
+      expect(url).toContain('tags=a+b');
+    });
+
+    it('serializes pipeDelimited with explode:false as pipe-separated', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        categories: {value: ['x', 'y'], style: 'pipeDelimited', explode: false},
+      });
+      expect(url).toContain('categories=x%7Cy');
+    });
+
+    it('serializes form with explode:false as comma-separated', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        ids: {value: [1, 2, 3], style: 'form', explode: false},
+      });
+      expect(url).toContain('ids=1%2C2%2C3');
+    });
+
+    it('serializes deepObject with explode:true as nested keys', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        filters: {value: {status: 'active', role: 'admin'}, style: 'deepObject', explode: true},
+      });
+      expect(url).toContain('filters%5Bstatus%5D=active');
+      expect(url).toContain('filters%5Brole%5D=admin');
+    });
+
+    it('serializes form with explode:true as repeated keys (default)', () => {
+      const url = buildUrl(baseUrl, '/search', {
+        tags: {value: ['a', 'b'], style: 'form', explode: true},
+      });
+      expect(url).toContain('tags=a');
+      expect(url).toContain('tags=b');
+      expect(url).not.toContain('tags=a%2Cb');
+    });
+
+    it('passes plain values through as default form+explode:true', () => {
+      const url = buildUrl(baseUrl, '/search', {q: 'test', limit: 10});
+      expect(url).toContain('q=test');
+      expect(url).toContain('limit=10');
+    });
+  });
+
+  describe('FormData and binary body handling', () => {
+    it('builds FormData from formData object for multipart', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({url: 'ok'}), {
+          status: 200,
+          headers: {'content-type': 'application/json'},
+        }),
+      ) as unknown as typeof fetch;
+      const client = createClient({baseUrl, fetchFn: fetchMock});
+
+      const blob = new Blob(['file-content'], {type: 'image/png'});
+      await client.request({
+        method: 'POST',
+        path: '/upload',
+        formData: {file: blob, caption: 'test'},
+        contentType: 'multipart/form-data',
+      });
+
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      expect(callArgs?.body).toBeInstanceOf(FormData);
+      // Content-Type should NOT be set for multipart (browser sets boundary)
+      const headers = callArgs?.headers as Record<string, string>;
+      expect(headers).not.toHaveProperty('Content-Type');
+    });
+
+    it('builds URLSearchParams for application/x-www-form-urlencoded', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({created: 1}), {
+          status: 200,
+          headers: {'content-type': 'application/json'},
+        }),
+      ) as unknown as typeof fetch;
+      const client = createClient({baseUrl, fetchFn: fetchMock});
+
+      await client.request({
+        method: 'POST',
+        path: '/bulk',
+        formData: {names: 'a,b', count: 1},
+        contentType: 'application/x-www-form-urlencoded',
+      });
+
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      expect(callArgs?.body).toBe('names=a%2Cb&count=1');
+      const headers = callArgs?.headers as Record<string, string>;
+      expect(headers).toHaveProperty('Content-Type', 'application/x-www-form-urlencoded');
+    });
+
+    it('passes Blob body through without JSON.stringify', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: {'content-type': 'application/json'},
+        }),
+      ) as unknown as typeof fetch;
+      const client = createClient({baseUrl, fetchFn: fetchMock});
+
+      const blob = new Blob(['binary'], {type: 'application/octet-stream'});
+      await client.request({
+        method: 'POST',
+        path: '/upload',
+        body: blob,
+        contentType: 'application/octet-stream',
+      });
+
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      expect(callArgs?.body).toBe(blob);
+      const headers = callArgs?.headers as Record<string, string>;
+      expect(headers).toHaveProperty('Content-Type', 'application/octet-stream');
+    });
+
+    it('uses custom contentType for JSON body when provided', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: {'content-type': 'application/json'},
+        }),
+      ) as unknown as typeof fetch;
+      const client = createClient({baseUrl, fetchFn: fetchMock});
+
+      await client.request({
+        method: 'POST',
+        path: '/data',
+        body: {key: 'value'},
+        contentType: 'application/vnd.custom+json',
+      });
+
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const headers = callArgs?.headers as Record<string, string>;
+      expect(headers).toHaveProperty('Content-Type', 'application/vnd.custom+json');
+    });
+  });
+
+  describe('stream response parsing', () => {
+    it('returns response.body for responseType: stream', async () => {
+      const stream = new ReadableStream();
+      const response = new Response(stream, {
+        status: 200,
+        headers: {'content-type': 'text/event-stream'},
+      });
+      const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
+      const client = createClient({baseUrl, fetchFn});
+
+      const result = await client.request<ReadableStream>({
+        method: 'GET',
+        path: '/events',
+        responseType: 'stream',
+      });
+
+      expect(result).toBe(response.body);
     });
   });
 });

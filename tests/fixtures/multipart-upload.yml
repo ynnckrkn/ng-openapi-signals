@@ -1,0 +1,68 @@
+openapi: 3.0.3
+info:
+  title: Multipart Upload Fixture
+  version: 1.0.0
+paths:
+  /users/{id}/avatar:
+    post:
+      operationId: uploadAvatar
+      tags: [Upload]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                caption:
+                  type: string
+      responses:
+        "200":
+          description: Avatar uploaded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+  /users/bulk:
+    post:
+      operationId: createBulkUsers
+      tags: [Upload]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - names
+              properties:
+                names:
+                  type: array
+                  items:
+                    type: string
+                count:
+                  type: integer
+      responses:
+        "200":
+          description: Bulk created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: integer

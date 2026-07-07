@@ -308,7 +308,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
 function generateApiFetchClient(config: GeneratorConfig): string {
   const responseTypeHints = config.runtime?.responseTypeHints ?? true;
   const responseTypeField = responseTypeHints
-    ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer';\n`
+    ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';\n`
     : '';
 
   return `import { Service, inject } from '@angular/core';
@@ -323,12 +323,37 @@ import {
   type ApiRequestContext,
 } from './providers';
 
+/**
+ * Query parameter serialization metadata for non-default styles.
+ *
+ * When a query parameter uses a non-default OpenAPI style/explode, the
+ * generated code wraps the value with this metadata so the runtime can
+ * serialize it correctly.
+ */
+export interface QueryParamOptions {
+  value: unknown;
+  style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+  explode: boolean;
+}
+
 export interface ApiRequestOptions {
   method: string;
   path: string;
-  query?: Record<string, unknown>;
-  headers?: Record<string, string>;
+  query?: Record<string, unknown | QueryParamOptions>;
+  headers?: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * Form data object for multipart/form-data or application/x-www-form-urlencoded.
+   * The runtime converts this to FormData or URLSearchParams respectively.
+   * When set, takes precedence over \`body\`.
+   */
+  formData?: object;
+  /**
+   * Explicit Content-Type for the request body. When omitted, the runtime
+   * defaults to 'application/json' for JSON bodies. For FormData, the
+   * Content-Type is set automatically by the browser (multipart boundary).
+   */
+  contentType?: string;
   signal?: AbortSignal;
 ${responseTypeField}}
 
@@ -347,19 +372,22 @@ export class ApiFetchClient {
 
     const authHeaders = this.auth ? await this.auth() : {};
 
+    // Build the request body and determine Content-Type.
+    const { body, contentType } = this.prepareBody(options);
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...this.defaultHeaders,
       ...authHeaders,
-      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers
+      ...(contentType ? { 'Content-Type': contentType } : {}),
+      ...this.stripUndefinedHeaders(options.headers)
     };
 
     const init: RequestInit = {
       method: options.method,
       signal: options.signal,
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+      ...(body !== undefined ? { body } : {})
     };
 
     const context: ApiRequestContext = { url, init };
@@ -392,9 +420,83 @@ export class ApiFetchClient {
     return (await this.parseBody(response, options.responseType)) as T;
   }
 
+  /**
+   * Removes headers with \`undefined\` values so they are not sent.
+   * Optional header parameters may resolve to \`undefined\` when omitted.
+   */
+  private stripUndefinedHeaders(
+    headers: Record<string, string | undefined> | undefined,
+  ): Record<string, string> {
+    if (!headers) {
+      return {};
+    }
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (value !== undefined) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Prepares the request body and determines the Content-Type.
+   *
+   * - FormData objects: builds FormData from the object, lets the browser
+   *   set the multipart boundary (no explicit Content-Type).
+   * - URLSearchParams: builds from the object for form-urlencoded.
+   * - Blob/ArrayBuffer: passes through with the provided contentType.
+   * - Plain objects: JSON.stringify with 'application/json'.
+   */
+  private prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; contentType?: string } {
+    // FormData takes precedence over body.
+    if (options.formData !== undefined) {
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(options.formData)) {
+        if (value === undefined || value === null) {
+          continue;
+        }
+        if (value instanceof Blob) {
+          formData.append(key, value);
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+      // For multipart/form-data, let the browser set the boundary.
+      // For application/x-www-form-urlencoded, use URLSearchParams.
+      if (options.contentType === 'application/x-www-form-urlencoded') {
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(options.formData)) {
+          if (value !== undefined && value !== null) {
+            params.append(key, String(value));
+          }
+        }
+        return { body: params.toString(), contentType: 'application/x-www-form-urlencoded' };
+      }
+      return { body: formData };
+    }
+
+    if (options.body !== undefined) {
+      // Pass through FormData, Blob, ArrayBuffer, URLSearchParams, ReadableStream.
+      if (
+        options.body instanceof FormData ||
+        options.body instanceof Blob ||
+        options.body instanceof ArrayBuffer ||
+        options.body instanceof URLSearchParams ||
+        (typeof ReadableStream !== 'undefined' && options.body instanceof ReadableStream)
+      ) {
+        return { body: options.body as BodyInit, contentType: options.contentType };
+      }
+      // Default: JSON.stringify.
+      return { body: JSON.stringify(options.body), contentType: options.contentType ?? 'application/json' };
+    }
+
+    return { body: undefined };
+  }
+
   private async parseBody(
     response: Response,
-    responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer',
+    responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream',
   ): Promise<unknown> {
     if (responseType) {
       switch (responseType) {
@@ -406,6 +508,8 @@ export class ApiFetchClient {
           return response.blob();
         case 'arrayBuffer':
           return response.arrayBuffer();
+        case 'stream':
+          return response.body;
       }
     }
 
@@ -426,24 +530,72 @@ export class ApiFetchClient {
     return response.blob();
   }
 
-  private buildUrl(path: string, query?: Record<string, unknown>): string {
+  private buildUrl(path: string, query?: Record<string, unknown | QueryParamOptions>): string {
     const url = new URL(path, this.baseUrl);
 
-    for (const [key, value] of Object.entries(query ?? {})) {
-      if (value === undefined || value === null) {
+    for (const [key, raw] of Object.entries(query ?? {})) {
+      if (raw === undefined || raw === null) {
         continue;
       }
 
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          url.searchParams.append(key, String(item));
+      // Check if the value is wrapped with serialization metadata.
+      const isWrapped =
+        typeof raw === 'object' &&
+        raw !== null &&
+        !Array.isArray(raw) &&
+        'value' in raw &&
+        'style' in raw;
+
+      if (isWrapped) {
+        const opts = raw as QueryParamOptions;
+        if (opts.value === undefined || opts.value === null) {
+          continue;
         }
+        this.appendQueryParam(url, key, opts.value, opts.style, opts.explode);
       } else {
-        url.searchParams.set(key, String(value));
+        this.appendQueryParam(url, key, raw, 'form', true);
       }
     }
 
     return url.toString();
+  }
+
+  /**
+   * Appends a query parameter using the specified OpenAPI style/explode.
+   *
+   * - form + explode:true  → key=val1&key=val2 (repeated keys)
+   * - form + explode:false → key=val1,val2 (comma-separated)
+   * - spaceDelimited + explode:false → key=val1%20val2
+   * - spaceDelimited + explode:true  → key=val1&key=val2
+   * - pipeDelimited + explode:false  → key=val1|val2
+   * - pipeDelimited + explode:true   → key=val1&key=val2
+   * - deepObject (explode:true only)  → key[prop]=val
+   */
+  private appendQueryParam(
+    url: URL,
+    key: string,
+    value: unknown,
+    style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject',
+    explode: boolean,
+  ): void {
+    if (Array.isArray(value)) {
+      if (explode) {
+        for (const item of value) {
+          url.searchParams.append(key, String(item));
+        }
+      } else {
+        const sep = style === 'spaceDelimited' ? ' ' : style === 'pipeDelimited' ? '|' : ',';
+        url.searchParams.set(key, value.map((v) => String(v)).join(sep));
+      }
+    } else if (typeof value === 'object' && value !== null && style === 'deepObject' && explode) {
+      for (const [prop, val] of Object.entries(value)) {
+        if (val !== undefined && val !== null) {
+          url.searchParams.append(\`\${key}[\${prop}]\`, String(val));
+        }
+      }
+    } else {
+      url.searchParams.set(key, String(value));
+    }
   }
 }
 `;
@@ -452,7 +604,7 @@ export class ApiFetchClient {
 function generateApiHttpClient(config: GeneratorConfig): string {
   const responseTypeHints = config.runtime?.responseTypeHints ?? true;
   const responseTypeField = responseTypeHints
-    ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer';\n`
+    ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';\n`
     : '';
 
   return `import { Service, inject } from '@angular/core';
@@ -468,12 +620,37 @@ import {
   type ApiRequestContext,
 } from './providers';
 
+/**
+ * Query parameter serialization metadata for non-default styles.
+ *
+ * When a query parameter uses a non-default OpenAPI style/explode, the
+ * generated code wraps the value with this metadata so the runtime can
+ * serialize it correctly.
+ */
+export interface QueryParamOptions {
+  value: unknown;
+  style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+  explode: boolean;
+}
+
 export interface ApiRequestOptions {
   method: string;
   path: string;
-  query?: Record<string, unknown>;
-  headers?: Record<string, string>;
+  query?: Record<string, unknown | QueryParamOptions>;
+  headers?: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * Form data object for multipart/form-data or application/x-www-form-urlencoded.
+   * The runtime converts this to FormData or URLSearchParams respectively.
+   * When set, takes precedence over \`body\`.
+   */
+  formData?: object;
+  /**
+   * Explicit Content-Type for the request body. When omitted, the runtime
+   * defaults to 'application/json' for JSON bodies. For FormData, the
+   * Content-Type is set automatically by the browser (multipart boundary).
+   */
+  contentType?: string;
   signal?: AbortSignal;
 ${responseTypeField}}
 
@@ -492,19 +669,22 @@ export class ApiHttpClient {
 
     const authHeaders = this.auth ? await this.auth() : {};
 
+    // Build the request body and determine Content-Type.
+    const { body, contentType } = this.prepareBody(options);
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...this.defaultHeaders,
       ...authHeaders,
-      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers
+      ...(contentType ? { 'Content-Type': contentType } : {}),
+      ...this.stripUndefinedHeaders(options.headers)
     };
 
     const context: ApiRequestContext = {
       url,
       method: options.method,
       headers,
-      body: options.body
+      body
     };
 
     if (this.onRequest) {
@@ -575,8 +755,85 @@ export class ApiHttpClient {
     }
   }
 
+  /**
+   * Removes headers with \`undefined\` values so they are not sent.
+   * Optional header parameters may resolve to \`undefined\` when omitted.
+   */
+  private stripUndefinedHeaders(
+    headers: Record<string, string | undefined> | undefined,
+  ): Record<string, string> {
+    if (!headers) {
+      return {};
+    }
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (value !== undefined) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Prepares the request body and determines the Content-Type.
+   *
+   * - FormData objects: builds FormData from the object, lets the browser
+   *   set the multipart boundary (no explicit Content-Type).
+   * - URLSearchParams: builds from the object for form-urlencoded.
+   * - Blob/ArrayBuffer: passes through with the provided contentType.
+   * - Plain objects: passed directly; HttpClient serializes as JSON.
+   */
+  private prepareBody(options: ApiRequestOptions): { body: unknown; contentType?: string } {
+    // FormData takes precedence over body.
+    if (options.formData !== undefined) {
+      if (options.contentType === 'application/x-www-form-urlencoded') {
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(options.formData)) {
+          if (value !== undefined && value !== null) {
+            params.append(key, String(value));
+          }
+        }
+        return { body: params.toString(), contentType: 'application/x-www-form-urlencoded' };
+      }
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(options.formData)) {
+        if (value === undefined || value === null) {
+          continue;
+        }
+        if (value instanceof Blob) {
+          formData.append(key, value);
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+      return { body: formData };
+    }
+
+    if (options.body !== undefined) {
+      // Pass through FormData, Blob, ArrayBuffer, URLSearchParams.
+      if (
+        options.body instanceof FormData ||
+        options.body instanceof Blob ||
+        options.body instanceof ArrayBuffer ||
+        options.body instanceof URLSearchParams
+      ) {
+        return { body: options.body, contentType: options.contentType };
+      }
+      // Default: let HttpClient handle JSON serialization.
+      return { body: options.body, contentType: options.contentType ?? 'application/json' };
+    }
+
+    return { body: undefined };
+  }
+
+  /**
+   * Maps the responseType to Angular's HttpClient responseType.
+   *
+   * 'stream' maps to 'blob' since Angular HttpClient has no native stream
+   * support. Consumers can call .stream() on the returned Blob.
+   */
   private mapResponseType(
-    responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer',
+    responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream',
   ): 'json' | 'text' | 'blob' | 'arraybuffer' | undefined {
     if (!responseType) {
       return undefined;
@@ -584,29 +841,79 @@ export class ApiHttpClient {
     switch (responseType) {
       case 'arrayBuffer':
         return 'arraybuffer';
+      case 'stream':
+        return 'blob';
       default:
         return responseType;
     }
   }
 
-  private buildUrl(path: string, query?: Record<string, unknown>): string {
+  private buildUrl(path: string, query?: Record<string, unknown | QueryParamOptions>): string {
     const url = new URL(path, this.baseUrl);
 
-    for (const [key, value] of Object.entries(query ?? {})) {
-      if (value === undefined || value === null) {
+    for (const [key, raw] of Object.entries(query ?? {})) {
+      if (raw === undefined || raw === null) {
         continue;
       }
 
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          url.searchParams.append(key, String(item));
+      // Check if the value is wrapped with serialization metadata.
+      const isWrapped =
+        typeof raw === 'object' &&
+        raw !== null &&
+        !Array.isArray(raw) &&
+        'value' in raw &&
+        'style' in raw;
+
+      if (isWrapped) {
+        const opts = raw as QueryParamOptions;
+        if (opts.value === undefined || opts.value === null) {
+          continue;
         }
+        this.appendQueryParam(url, key, opts.value, opts.style, opts.explode);
       } else {
-        url.searchParams.set(key, String(value));
+        this.appendQueryParam(url, key, raw, 'form', true);
       }
     }
 
     return url.toString();
+  }
+
+  /**
+   * Appends a query parameter using the specified OpenAPI style/explode.
+   *
+   * - form + explode:true  → key=val1&key=val2 (repeated keys)
+   * - form + explode:false → key=val1,val2 (comma-separated)
+   * - spaceDelimited + explode:false → key=val1%20val2
+   * - spaceDelimited + explode:true  → key=val1&key=val2
+   * - pipeDelimited + explode:false  → key=val1|val2
+   * - pipeDelimited + explode:true   → key=val1&key=val2
+   * - deepObject (explode:true only)  → key[prop]=val
+   */
+  private appendQueryParam(
+    url: URL,
+    key: string,
+    value: unknown,
+    style: 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject',
+    explode: boolean,
+  ): void {
+    if (Array.isArray(value)) {
+      if (explode) {
+        for (const item of value) {
+          url.searchParams.append(key, String(item));
+        }
+      } else {
+        const sep = style === 'spaceDelimited' ? ' ' : style === 'pipeDelimited' ? '|' : ',';
+        url.searchParams.set(key, value.map((v) => String(v)).join(sep));
+      }
+    } else if (typeof value === 'object' && value !== null && style === 'deepObject' && explode) {
+      for (const [prop, val] of Object.entries(value)) {
+        if (val !== undefined && val !== null) {
+          url.searchParams.append(\`\${key}[\${prop}]\`, String(val));
+        }
+      }
+    } else {
+      url.searchParams.set(key, String(value));
+    }
   }
 }
 `;

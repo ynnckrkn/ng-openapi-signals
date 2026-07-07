@@ -7,6 +7,7 @@ import {
   validateConfig,
   defineConfig,
   isGroupBy,
+  isQueryStyle,
   isTransport,
   DEFAULT_CONFIG,
   DEFAULT_RUNTIME_CONFIG,
@@ -168,6 +169,44 @@ describe('config', () => {
       expect(config.runtime.defaultHeaders).toEqual({'X-A': 'a'});
       expect(config.runtime.responseTypeHints).toBe(false);
     });
+
+    it('defaults defaultQueryStyle to form', () => {
+      const config = resolveConfig({}, {});
+      expect(config.runtime.defaultQueryStyle).toBe('form');
+    });
+
+    it('file defaultQueryStyle overrides default', () => {
+      const config = resolveConfig({}, {runtime: {defaultQueryStyle: 'pipeDelimited'}});
+      expect(config.runtime.defaultQueryStyle).toBe('pipeDelimited');
+    });
+
+    it('CLI defaultQueryStyle overrides file', () => {
+      const config = resolveConfig(
+        {runtime: {defaultQueryStyle: 'spaceDelimited'}},
+        {runtime: {defaultQueryStyle: 'pipeDelimited'}},
+      );
+      expect(config.runtime.defaultQueryStyle).toBe('spaceDelimited');
+    });
+
+    it('defaults defaultQueryExplode to true', () => {
+      const config = resolveConfig({}, {});
+      expect(config.runtime.defaultQueryExplode).toBe(true);
+    });
+
+    it('file defaultQueryExplode overrides default', () => {
+      const config = resolveConfig({}, {runtime: {defaultQueryExplode: false}});
+      expect(config.runtime.defaultQueryExplode).toBe(false);
+    });
+
+    it('defaults preferContentType to application/json', () => {
+      const config = resolveConfig({}, {});
+      expect(config.runtime.preferContentType).toBe('application/json');
+    });
+
+    it('file preferContentType overrides default', () => {
+      const config = resolveConfig({}, {runtime: {preferContentType: 'multipart/form-data'}});
+      expect(config.runtime.preferContentType).toBe('multipart/form-data');
+    });
   });
 
   describe('validateConfig', () => {
@@ -265,6 +304,50 @@ describe('config', () => {
         }),
       ).toThrow('Invalid runtime.transport');
     });
+
+    it('throws when defaultQueryStyle is invalid', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {defaultQueryStyle: 'invalid' as unknown as 'form'},
+        }),
+      ).toThrow('Invalid runtime.defaultQueryStyle');
+    });
+
+    it('throws when defaultQueryExplode is not a boolean', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {defaultQueryExplode: 'yes' as unknown as boolean},
+        }),
+      ).toThrow('Invalid runtime.defaultQueryExplode');
+    });
+
+    it('throws when preferContentType is not a string', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {preferContentType: 123 as unknown as string},
+        }),
+      ).toThrow('Invalid runtime.preferContentType');
+    });
+
+    it('does not throw for valid new runtime config', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {defaultQueryStyle: 'deepObject', defaultQueryExplode: false, preferContentType: 'multipart/form-data'},
+        }),
+      ).not.toThrow();
+    });
   });
 
   describe('defineConfig', () => {
@@ -296,6 +379,20 @@ describe('config', () => {
     it('returns false for invalid values', () => {
       expect(isTransport('invalid')).toBe(false);
       expect(isTransport(undefined)).toBe(false);
+    });
+  });
+
+  describe('isQueryStyle', () => {
+    it('returns true for valid query styles', () => {
+      expect(isQueryStyle('form')).toBe(true);
+      expect(isQueryStyle('spaceDelimited')).toBe(true);
+      expect(isQueryStyle('pipeDelimited')).toBe(true);
+      expect(isQueryStyle('deepObject')).toBe(true);
+    });
+
+    it('returns false for invalid values', () => {
+      expect(isQueryStyle('invalid')).toBe(false);
+      expect(isQueryStyle(undefined)).toBe(false);
     });
   });
 });
