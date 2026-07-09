@@ -49,6 +49,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Without any new configuration, the generated runtime behaves identically to 0.6.x: query params use default `form` + `explode: true` (plain values, no metadata wrapper), request bodies are JSON-serialized with `Content-Type: application/json`, and no `formData`/`contentType` fields are emitted.
 - Existing OpenAPI specs without `style`/`explode` on parameters, without `multipart/form-data` request bodies, and without header parameters produce identical generated output.
 - The `requestBodyType` field on `OperationModel` is kept for backward compatibility (delegates to `requestBody.type`).
+- The runtime codegen refactor is internal only — no generated output, CLI, or config changes.
 
 ## [0.6.2] - 2026-07-06
 
