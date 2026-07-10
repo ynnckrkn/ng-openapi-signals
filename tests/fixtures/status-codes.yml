@@ -55,6 +55,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Foo"
+  /default-only:
+    get:
+      operationId: getDefaultOnly
+      tags: [Multi]
+      responses:
+        default:
+          description: default response with schema
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Foo"
+  /default-and-204:
+    get:
+      operationId: getDefaultAnd204
+      tags: [Multi]
+      responses:
+        "204":
+          description: no content
+        default:
+          description: default response with schema
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bar"
+  /default-no-content:
+    get:
+      operationId: getDefaultNoContent
+      tags: [Multi]
+      responses:
+        default:
+          description: default response without content
 components:
   schemas:
     Foo:

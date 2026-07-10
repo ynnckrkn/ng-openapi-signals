@@ -62,8 +62,13 @@ export type ApiErrorMapper = (response: Response) => Promise<ApiError | Error> |
 export type ApiRequestHook = (request: ApiRequestContext) => void | Promise<void>;
 
 /**
- * Called after a successful response is received. Receives the raw Response.
+ * Called after a successful response is received, before the body is parsed.
+ * Receives a cloned \`Response\` so the hook can inspect the body without
+ * interfering with the runtime's subsequent body parsing.
  * Return value is ignored.
+ *
+ * Note: the clone is a one-shot — if you call .json()/.text()/.blob() on it,
+ * do so only once. The original response is read by the runtime afterwards.
  */
 export type ApiResponseHook = (response: Response) => void | Promise<void>;
 

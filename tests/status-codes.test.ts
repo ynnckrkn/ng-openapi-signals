@@ -44,4 +44,22 @@ describe('success response status codes', () => {
     expect(content).not.toContain('Foo | Bar | Error');
     expect(content).not.toContain('request<Error>');
   });
+
+  it('uses the default response schema as fallback when no 2xx is defined', async () => {
+    const content = await readFile(join(OUTPUT_DIR, 'resources', 'multi.api.ts'), 'utf8');
+    expect(content).toContain('getDefaultOnlyResource');
+    expect(content).toContain('request<Foo>');
+  });
+
+  it('uses the default response schema when 204 contributes nothing', async () => {
+    const content = await readFile(join(OUTPUT_DIR, 'resources', 'multi.api.ts'), 'utf8');
+    expect(content).toContain('getDefaultAnd204Resource');
+    expect(content).toContain('request<Bar>');
+  });
+
+  it('returns void when default response has no content/schema', async () => {
+    const content = await readFile(join(OUTPUT_DIR, 'resources', 'multi.api.ts'), 'utf8');
+    expect(content).toContain('getDefaultNoContentResource');
+    expect(content).toContain('request<void>');
+  });
 });

@@ -51,8 +51,8 @@ export type ApiErrorMapper = (
 export type ApiRequestHook = (request: ApiRequestContext) => void | Promise<void>;
 
 /**
- * Called after a successful response is received. Receives the raw \`HttpResponse\`.
- * Return value is ignored.
+ * Called after a successful response is received, before the body is returned.
+ * Receives the raw \`HttpResponse\`. Return value is ignored.
  */
 export type ApiResponseHook = (response: HttpResponse<unknown>) => void | Promise<void>;
 

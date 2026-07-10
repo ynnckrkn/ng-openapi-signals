@@ -216,7 +216,7 @@ function prepareBody(options: ApiRequestOptions): {body: unknown; contentType?: 
     return {body: formData};
   }
 
-  if (options.body !== undefined) {
+  if (options.body !== undefined && options.body !== null) {
     if (
       options.body instanceof FormData ||
       options.body instanceof Blob ||
@@ -664,6 +664,21 @@ describe('ApiHttpClient request logic', () => {
   describe('stream responseType mapping', () => {
     it('maps stream to blob (Angular HttpClient has no native stream)', () => {
       expect(mapResponseType('stream')).toBe('blob');
+    });
+  });
+
+  describe('body: null handling', () => {
+    it('does not send a body when body is null', async () => {
+      const response = httpResponse({ok: true}, 200);
+      const http = mockHttp(response);
+      const client = createClient({baseUrl, http});
+
+      await client.request({method: 'POST', path: '/users', body: null});
+
+      const callArgs = (http.request as any).mock.calls[0];
+      const opts = callArgs?.[2];
+      expect(opts.body).toBeUndefined();
+      expect(opts.headers).not.toHaveProperty('Content-Type');
     });
   });
 });

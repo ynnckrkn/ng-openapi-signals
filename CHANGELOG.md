@@ -7,6 +7,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **Array-of-enum type parenthesization**: Inline enum arrays (e.g. a property `types: array<string, enum>`) were generated as `'A' | 'B' | 'C'[]` — the `[]` bound only to the last union member instead of the whole union. `arrayToTsType` in `codegen/schema-to-ts.ts` now wraps union/intersection inner types in parentheses before appending `[]`, producing `('A' | 'B' | 'C')[]`. `collectType` in `generate-models.ts` was updated to unwrap outer parentheses during import collection so parenthesized array-of-union types are recursed into correctly. Named enum refs (`UserStatus[]`) and tuples are unaffected.
+- **`default` response as fallback return type**: Operations with only a `default` response (no explicit 2xx codes) — common in NestJS-generated specs — were generated as `Promise<void>` / `request<void>`, ignoring the schema defined under `default`. `extractResponseType` in `generate-api.ts` now evaluates the `default` response's schema as a fallback when no 2xx schema is collected, so endpoints like `POST /api/v1/auth/login` resolve to their concrete DTO. Endpoints with explicit 2xx codes are unaffected — `default` is never unioned into them.
+- **`body: null` serialized as `"null"` [G] 11**: `prepareBody` in the fetch and httpClient runtime templates treated `null` as a defined body, producing `JSON.stringify(null)` → the string `"null"` sent with `Content-Type: application/json`. The guard is now `body !== undefined && body !== null`, so a `null` body results in no body being sent (matching the existing `formData` branch behavior).
+- **Empty 200 body with JSON content-type throws**: A `200` response with `Content-Type: application/json` and an empty body caused `response.json()` to throw a `SyntaxError`. The fetch runtime now uses a `parseJson` helper that reads the body as text first, returns `undefined` for empty bodies, and only calls `JSON.parse` on non-empty text. Both the explicit `responseType: 'json'` path and the content-type sniffing fallback use this safe method.
+- **`onResponse` hook consuming the body**: The `onResponse` hook received the raw `Response` before `parseBody` ran; if the hook called `await response.json()` / `.text()` / `.blob()`, the subsequent `parseBody` failed with "body already consumed." The fetch runtime now passes `response.clone()` to the hook, so consumers can safely inspect the clone's body without interfering with the runtime's body parsing. The `ApiResponseHook` docstring in both `providers-fetch.ts` and `providers-http-client.ts` was updated to document that the hook receives a clone and warn about one-shot body consumption.
+
+### Changed
+
+- `collectType` in `generate-models.ts` now unwraps a single surrounding pair of parentheses before recursing, so array-of-union types like `('A' | 'B' | 'C')[]` are correctly split for import collection.
+- `extractResponseType` in `generate-api.ts` now inspects the `default` response as a fallback after the 2xx loop, preserving existing behavior for mixed endpoints (2xx types are preferred; `default` is only used when no 2xx schema is found).
+- `ApiFetchClient.parseBody` (fetch transport) now delegates JSON parsing to a new `parseJson` helper instead of calling `response.json()` directly.
+- `ApiFetchClient.request` (fetch transport) now passes `response.clone()` to `onResponse` instead of the original response.
+- `prepareBody` in both `api-fetch-client.ts` and `api-http-client.ts` runtime templates now skips `null` bodies in addition to `undefined`.
+- `ApiResponseHook` docstring updated in `providers-fetch.ts` (fetch transport) and `providers-http-client.ts` (httpClient transport) to document clone semantics and body-consumption caveats.
+
+### Tests
+
+- **`tests/enum.test.ts`** + **`tests/fixtures/enum.yml`**: Added inline enum array property (`tags`) to `StatusResponse` and a test asserting the generated type is parenthesized `('...')[]`, not `'...'[]`.
+- **`tests/status-codes.test.ts`** + **`tests/fixtures/status-codes.yml`**: Added `/default-only`, `/default-and-204`, and `/default-no-content` paths with tests for default-response fallback (default-only → DTO, default+204 → DTO, default-no-content → void).
+- **`tests/api-fetch-client.test.ts`**: Added 7 tests for `body: null` handling (no body sent, no Content-Type), empty 200 body with JSON content-type (returns `undefined`, no throw), and `onResponse` clone behavior (hook receives clone, hook can consume clone body without breaking `parseBody`). Updated test-local `prepareBody`, `parseBody`, and `request` to mirror the template fixes (`body !== null`, `parseJson`, `response.clone()`).
+- **`tests/api-http-client.test.ts`**: Added `body: null` test asserting no body and no Content-Type. Updated test-local `prepareBody` to mirror the `body !== null` guard.
+
 ## [0.7.0] - 2026-07-10
 
 ### Added

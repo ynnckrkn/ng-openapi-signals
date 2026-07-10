@@ -440,6 +440,22 @@ function extractResponseType(operation: any): {
     }
   }
 
+  // Fallback: when no explicit 2xx schema was found, use the `default` response
+  // schema as the return type. Many OpenAPI specs only define a `default` response
+  // with the success schema (e.g. NestJS-generated specs), so without this the
+  // generator would emit `void` even though a concrete DTO is defined.
+  if (successSchemas.length === 0 && responses['default']) {
+    const {schema, contentType} = extractSchemaFromResponse(responses['default']);
+
+    if (schema && schema !== 'void') {
+      successSchemas.push(schema);
+
+      if (!responseParser && contentType) {
+        responseParser = parserForContentType(contentType);
+      }
+    }
+  }
+
   if (successSchemas.length === 0) {
     return {responseType: 'void'};
   }

@@ -116,7 +116,11 @@ function arrayToTsType(schema: any): string {
     return `[${tuple}]`;
   }
 
-  return `${schemaToTsType(schema.items)}[]`;
+  const inner = schemaToTsType(schema.items);
+  // Wrap unions/intersections in parentheses so `[]` binds to the whole type,
+  // not just the last member (e.g. `('A' | 'B' | 'C')[]` instead of `'A' | 'B' | 'C'[]`).
+  const wrapped = / \| | & /.test(inner) && !inner.startsWith('(') ? `(${inner})` : inner;
+  return `${wrapped}[]`;
 }
 
 /**

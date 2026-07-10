@@ -63,7 +63,7 @@ import {defineConfig} from 'ng-openapi-signals/config';
 
 export default defineConfig({
   input: './openapi.json',
-  output: './src/generated/api',
+  output: 'src/generated/api',
 });
 ```
 
@@ -85,7 +85,7 @@ This generates an Angular API client in `src/generated/api`:
 
 ```text
 src/generated/api/
-  api-fetch-client.ts
+  api-fetch-client.ts        # or api-http-client.ts (depends on transport)
   api-error.ts
   signal-utils.ts
   providers.ts

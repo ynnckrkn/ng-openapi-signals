@@ -105,7 +105,9 @@ export class ApiFetchClient {
     }
 
     if (this.onResponse) {
-      await this.onResponse(response);
+      // Pass a clone so the hook can inspect the body without consuming the
+      // original stream (which parseBody needs to read afterwards).
+      await this.onResponse(response.clone());
     }
 
     if (response.status === 204) {
@@ -171,7 +173,7 @@ export class ApiFetchClient {
       return { body: formData };
     }
 
-    if (options.body !== undefined) {
+    if (options.body !== undefined && options.body !== null) {
       // Pass through FormData, Blob, ArrayBuffer, URLSearchParams, ReadableStream.
       if (
         options.body instanceof FormData ||
@@ -196,7 +198,7 @@ export class ApiFetchClient {
     if (responseType) {
       switch (responseType) {
         case 'json':
-          return response.json();
+          return this.parseJson(response);
         case 'text':
           return response.text();
         case 'blob':
@@ -211,7 +213,7 @@ export class ApiFetchClient {
     const contentType = response.headers.get('content-type') ?? '';
 
     if (contentType.includes('application/json')) {
-      return response.json();
+      return this.parseJson(response);
     }
 
     if (contentType.startsWith('text/')) {
@@ -223,6 +225,19 @@ export class ApiFetchClient {
     }
 
     return response.blob();
+  }
+
+  /**
+   * Safely parses a JSON response body. An empty body (e.g. a 200 with
+   * Content-Type: application/json but no content) returns \`undefined\`
+   * instead of throwing a SyntaxError.
+   */
+  private async parseJson(response: Response): Promise<unknown> {
+    const text = await response.text();
+    if (text.length === 0) {
+      return undefined;
+    }
+    return JSON.parse(text);
   }
 
   private buildUrl(path: string, query?: Record<string, unknown | QueryParamOptions>): string {

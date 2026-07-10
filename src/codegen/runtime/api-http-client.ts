@@ -208,7 +208,7 @@ export class ApiHttpClient {
       return { body: formData };
     }
 
-    if (options.body !== undefined) {
+    if (options.body !== undefined && options.body !== null) {
       // Pass through FormData, Blob, ArrayBuffer, URLSearchParams.
       if (
         options.body instanceof FormData ||

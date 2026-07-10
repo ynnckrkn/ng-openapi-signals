@@ -102,6 +102,14 @@ function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown 
   return url.toString();
 }
 
+async function parseJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (text.length === 0) {
+    return undefined;
+  }
+  return JSON.parse(text);
+}
+
 async function parseBody(
   response: Response,
   responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream',
@@ -109,7 +117,7 @@ async function parseBody(
   if (responseType) {
     switch (responseType) {
       case 'json':
-        return response.json();
+        return parseJson(response);
       case 'text':
         return response.text();
       case 'blob':
@@ -124,7 +132,7 @@ async function parseBody(
   const contentType = response.headers.get('content-type') ?? '';
 
   if (contentType.includes('application/json')) {
-    return response.json();
+    return parseJson(response);
   }
 
   if (contentType.startsWith('text/')) {
@@ -166,7 +174,7 @@ function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; 
     return {body: formData};
   }
 
-  if (options.body !== undefined) {
+  if (options.body !== undefined && options.body !== null) {
     if (
       options.body instanceof FormData ||
       options.body instanceof Blob ||
@@ -243,7 +251,9 @@ function createClient(deps: ClientDeps) {
     }
 
     if (deps.onResponse) {
-      await deps.onResponse(response);
+      // Pass a clone so the hook can inspect the body without consuming the
+      // original stream (which parseBody needs to read afterwards).
+      await deps.onResponse(response.clone());
     }
 
     if (response.status === 204) {
@@ -900,6 +910,130 @@ describe('ApiFetchClient request logic', () => {
       });
 
       expect(result).toBe(response.body);
+    });
+  });
+
+  describe('body: null handling', () => {
+    it('does not send a body when body is null', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: {'content-type': 'application/json'},
+        }),
+      ) as unknown as typeof fetch;
+      const client = createClient({baseUrl, fetchFn: fetchMock});
+
+      await client.request({method: 'POST', path: '/users', body: null});
+
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      expect(callArgs?.body).toBeUndefined();
+      const headers = callArgs?.headers as Record<string, string>;
+      expect(headers).not.toHaveProperty('Content-Type');
+    });
+
+    it('does not send Content-Type when body is null', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(null, {status: 204}),
+      ) as unknown as typeof fetch;
+      const client = createClient({baseUrl, fetchFn: fetchMock});
+
+      await client.request({method: 'DELETE', path: '/users/1', body: null});
+
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const headers = callArgs?.headers as Record<string, string>;
+      expect(headers).not.toHaveProperty('Content-Type');
+    });
+  });
+
+  describe('empty 200 body with JSON content-type', () => {
+    it('returns undefined instead of throwing for empty body with json content-type', async () => {
+      const response = new Response('', {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<unknown>({method: 'GET', path: '/x'});
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns undefined instead of throwing for empty body with responseType: json', async () => {
+      const response = new Response('', {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<unknown>({
+        method: 'GET',
+        path: '/x',
+        responseType: 'json',
+      });
+
+      expect(result).toBeUndefined();
+    });
+
+    it('still parses non-empty JSON bodies correctly', async () => {
+      const response = new Response(JSON.stringify({ok: true}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<{ok: boolean}>({method: 'GET', path: '/x'});
+
+      expect(result).toEqual({ok: true});
+    });
+  });
+
+  describe('onResponse receives a clone', () => {
+    it('passes a clone to onResponse so the body can still be parsed afterwards', async () => {
+      const received: Response[] = [];
+      const response = new Response(JSON.stringify({ok: true}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
+
+      const client = createClient({
+        baseUrl,
+        onResponse: (res) => {
+          received.push(res);
+        },
+        fetchFn,
+      });
+
+      const result = await client.request<{ok: boolean}>({method: 'GET', path: '/x'});
+
+      // The hook received a response (clone)
+      expect(received).toHaveLength(1);
+      // The runtime still successfully parsed the body from the original
+      expect(result).toEqual({ok: true});
+    });
+
+    it('allows onResponse to consume the clone body without breaking parseBody', async () => {
+      const consumed: unknown[] = [];
+      const response = new Response(JSON.stringify({data: 42}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
+
+      const client = createClient({
+        baseUrl,
+        onResponse: async (res) => {
+          consumed.push(await res.json());
+        },
+        fetchFn,
+      });
+
+      const result = await client.request<{data: number}>({method: 'GET', path: '/x'});
+
+      // The hook consumed the clone's body
+      expect(consumed).toEqual([{data: 42}]);
+      // The runtime still parsed the original body successfully
+      expect(result).toEqual({data: 42});
     });
   });
 });

@@ -149,6 +149,13 @@ export function collectType(type: string, output: Set<string>, schemaNames: Set<
     return;
   }
 
+  // Unwrap a single surrounding pair of parentheses so that array-of-union
+  // types like `('A' | 'B' | 'C')[]` are recursed into correctly: strip `[]`
+  // first → `('A' | 'B' | 'C')` → unwrap parens → union split branch.
+  if (type.startsWith('(') && type.endsWith(')')) {
+    type = type.slice(1, -1);
+  }
+
   if (type.endsWith('[]')) {
     collectType(type.slice(0, -2), output, schemaNames);
     return;

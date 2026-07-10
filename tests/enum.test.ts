@@ -44,4 +44,15 @@ describe('enum generation', () => {
     expect(content).toContain('code: StatusCode;');
     expect(content).toContain('import { StatusCode, UserStatus } from');
   });
+
+  it('wraps inline enum arrays in parentheses so [] binds to the whole union', async () => {
+    const content = await readFile(join(OUTPUT_DIR, 'models', 'status-response.ts'), 'utf8');
+    // Must be `('A' | 'B' | ...)[]`, NOT `'A' | 'B' | ... | 'XY_Z'[]`.
+    // The generator emits a multiline parenthesized union, so verify structurally.
+    expect(content).toContain("'A_BC'");
+    expect(content).toContain("'XY_Z'");
+    // The opening paren must appear before the first enum value and the [] after the last.
+    expect(content).toMatch(/\([\s\S]*'A_BC'[\s\S]*'XY_Z'[\s\S]*\)\s*\[\]/);
+    expect(content).not.toContain("'XY_Z'[]");
+  });
 });
