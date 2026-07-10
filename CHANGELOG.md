@@ -61,6 +61,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **Wasted `FormData` construction in `prepareBody` (fetch transport)**: The fetch transport `prepareBody` always built a `FormData` object from `options.formData` before checking whether the content type was `application/x-www-form-urlencoded`. When the content type was form-urlencoded, the `FormData` was discarded and replaced with `URLSearchParams`. The content-type check now happens first, matching the `httpClient` transport and avoiding the wasted allocation.
 - **Test fidelity gap for `stripUndefinedHeaders`**: The `api-fetch-client.test.ts` test helpers typed `headers` as `Record<string, string>` and spread values directly, while the generated runtime uses `Record<string, string | undefined>` with a `stripUndefinedHeaders` helper. The test helpers now mirror the runtime logic, ensuring optional header parameters that resolve to `undefined` are properly stripped.
 
+
 ## [0.6.2] - 2026-07-06
 
 ### Changed
