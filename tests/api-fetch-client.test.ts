@@ -13,7 +13,7 @@ interface ApiRequestOptions {
   method: string;
   path: string;
   query?: Record<string, unknown | QueryParamOptions>;
-  headers?: Record<string, string>;
+  headers?: Record<string, string | undefined>;
   body?: unknown;
   formData?: Record<string, unknown>;
   contentType?: string;
@@ -139,7 +139,10 @@ async function parseBody(
 }
 
 function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; contentType?: string } {
+  // FormData takes precedence over body.
   if (options.formData !== undefined) {
+    // For application/x-www-form-urlencoded, build URLSearchParams.
+    // For multipart/form-data, build FormData and let the browser set the boundary.
     if (options.contentType === 'application/x-www-form-urlencoded') {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(options.formData)) {
@@ -190,12 +193,27 @@ function createClient(deps: ClientDeps) {
 
     const {body, contentType} = prepareBody(options);
 
+    function stripUndefinedHeaders(
+      headers: Record<string, string | undefined> | undefined,
+    ): Record<string, string> {
+      if (!headers) {
+        return {};
+      }
+      const result: Record<string, string> = {};
+      for (const [key, value] of Object.entries(headers)) {
+        if (value !== undefined) {
+          result[key] = value;
+        }
+      }
+      return result;
+    }
+
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...defaultHeaders,
       ...authHeaders,
       ...(contentType ? {'Content-Type': contentType} : {}),
-      ...options.headers,
+      ...stripUndefinedHeaders(options.headers),
     };
 
     const init: RequestInit = {
@@ -220,12 +238,12 @@ function createClient(deps: ClientDeps) {
 
     const response = await pipeline();
 
-    if (deps.onResponse) {
-      await deps.onResponse(response);
-    }
-
     if (!response.ok) {
       throw await (deps.errorMapper ?? defaultErrorMapper)(response);
+    }
+
+    if (deps.onResponse) {
+      await deps.onResponse(response);
     }
 
     if (response.status === 204) {

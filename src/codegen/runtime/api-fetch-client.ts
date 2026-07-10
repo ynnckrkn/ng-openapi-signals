@@ -100,12 +100,12 @@ export class ApiFetchClient {
 
     const response = await pipeline();
 
-    if (this.onResponse) {
-      await this.onResponse(response);
-    }
-
     if (!response.ok) {
       throw await this.errorMapper(response);
+    }
+
+    if (this.onResponse) {
+      await this.onResponse(response);
     }
 
     if (response.status === 204) {
@@ -146,6 +146,17 @@ export class ApiFetchClient {
   private prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; contentType?: string } {
     // FormData takes precedence over body.
     if (options.formData !== undefined) {
+      // For application/x-www-form-urlencoded, build URLSearchParams.
+      // For multipart/form-data, build FormData and let the browser set the boundary.
+      if (options.contentType === 'application/x-www-form-urlencoded') {
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(options.formData)) {
+          if (value !== undefined && value !== null) {
+            params.append(key, String(value));
+          }
+        }
+        return { body: params.toString(), contentType: 'application/x-www-form-urlencoded' };
+      }
       const formData = new FormData();
       for (const [key, value] of Object.entries(options.formData)) {
         if (value === undefined || value === null) {
@@ -156,17 +167,6 @@ export class ApiFetchClient {
         } else {
           formData.append(key, String(value));
         }
-      }
-      // For multipart/form-data, let the browser set the boundary.
-      // For application/x-www-form-urlencoded, use URLSearchParams.
-      if (options.contentType === 'application/x-www-form-urlencoded') {
-        const params = new URLSearchParams();
-        for (const [key, value] of Object.entries(options.formData)) {
-          if (value !== undefined && value !== null) {
-            params.append(key, String(value));
-          }
-        }
-        return { body: params.toString(), contentType: 'application/x-www-form-urlencoded' };
       }
       return { body: formData };
     }
