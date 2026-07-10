@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-10
+
 ### Added
 
 - **Advanced query parameter serialization**: OpenAPI parameter `style` and `explode` are now supported for query parameters. The generated code wraps non-default style params with metadata (`{ value, style, explode }`) and the runtime `buildUrl` serializes them according to the OpenAPI specification. Supported styles: `form` (default), `spaceDelimited`, `pipeDelimited`, `deepObject`, with `explode: true/false` variants.
