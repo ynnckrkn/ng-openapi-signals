@@ -55,4 +55,27 @@ describe('header parameter generation', () => {
     expect(content).toContain('deleteUserWithHeader(');
     expect(content).toMatch(/deleteUserWithHeader\([\s\S]*params:/);
   });
+
+  it('wraps header params with readSignalOrValue in mutation methods', async () => {
+    const content = await readApiFile();
+    // Mutation methods receive MaybeSignal<T> and must unwrap signals before
+    // assigning to the headers object, otherwise TS2322 is raised:
+    //   Type 'MaybeSignal<string>' is not assignable to type 'string | undefined'.
+    expect(content).toContain(
+      "'X-Request-Id': readSignalOrValue(params['X-Request-Id'])",
+    );
+  });
+
+  it('does not double-unwrap header params in GET resource methods', async () => {
+    const content = await readApiFile();
+    // GET resource methods already resolve signals in the paramsFactory, so the
+    // headers expression must pass the already-resolved plain value directly.
+    expect(content).toContain("'X-Request-Id': params['X-Request-Id']");
+  });
+
+  it('types mutation header params as MaybeSignal', async () => {
+    const content = await readApiFile();
+    // The mutation params type must accept signals for header values.
+    expect(content).toMatch(/'X-Request-Id'\?:\s*MaybeSignal<string>/);
+  });
 });

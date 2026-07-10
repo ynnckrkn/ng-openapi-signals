@@ -51,6 +51,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The `requestBodyType` field on `OperationModel` is kept for backward compatibility (delegates to `requestBody.type`).
 - The runtime codegen refactor is internal only — no generated output, CLI, or config changes.
 
+### Fixed
+
+- **Header params in mutation methods**: `generateHeaderExpression` now wraps header param values with `readSignalOrValue()` for mutation methods (POST/PUT/PATCH/DELETE). Header values passed as signals are unwrapped before being merged into the request `headers` object. GET resource methods remain unchanged (header values are already resolved in the `paramsFactory`).
+
 ## [0.6.2] - 2026-07-06
 
 ### Changed

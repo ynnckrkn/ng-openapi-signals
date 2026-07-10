@@ -150,7 +150,7 @@ function generateResourceMethod(operation: OperationModel, responseTypeHints: bo
   const paramsExpression = generateResourceParamsExpression(operation);
   const pathExpression = generatePathExpression(operation);
   const queryExpression = generateQueryExpression(operation);
-  const headerExpression = generateHeaderExpression(operation);
+  const headerExpression = generateHeaderExpression(operation, false);
   const paramsArg = hasParams ? `params: ${paramsType}` : '';
   const paramsFactory = hasParams
     ? `params: (): ${resourceParamsType} => (${paramsExpression}),`
@@ -217,7 +217,7 @@ function generateMutationMethod(operation: OperationModel, responseTypeHints: bo
   const paramsParameter = hasParams ? `params: ${paramsType}, ` : '';
   const pathExpression = generatePathExpression(operation);
   const queryExpression = generateQueryExpression(operation);
-  const headerExpression = generateHeaderExpression(operation);
+  const headerExpression = generateHeaderExpression(operation, true);
 
   const requestLines = [`method: '${operation.method.toUpperCase()}',`, `path: ${pathExpression},`];
 
@@ -377,13 +377,17 @@ ${properties}
  * Generates a headers object expression for header parameters.
  * Returns empty string if there are no header parameters.
  */
-function generateHeaderExpression(operation: OperationModel): string {
+function generateHeaderExpression(operation: OperationModel, unwrapSignals = false): string {
   if (operation.headerParams.length === 0) {
     return '';
   }
 
   const properties = operation.headerParams
-    .map((param) => `            '${param.name}': ${formatParamAccess(param)}`)
+    .map((param) => {
+      const access = formatParamAccess(param);
+      const value = unwrapSignals ? `readSignalOrValue(${access})` : access;
+      return `            '${param.name}': ${value}`;
+    })
     .join(',\n');
 
   return `{
