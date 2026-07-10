@@ -18,6 +18,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 
 - `collectType` in `generate-models.ts` now unwraps a single surrounding pair of parentheses before recursing, so array-of-union types like `('A' | 'B' | 'C')[]` are correctly split for import collection.
+- `collectType` in `generate-api.ts` now unwraps a single surrounding pair of parentheses before recursing, so parenthesized array-of-union types in response/request/param types are correctly split for import collection. 
 - `extractResponseType` in `generate-api.ts` now inspects the `default` response as a fallback after the 2xx loop, preserving existing behavior for mixed endpoints (2xx types are preferred; `default` is only used when no 2xx schema is found).
 - `ApiFetchClient.parseBody` (fetch transport) now delegates JSON parsing to a new `parseJson` helper instead of calling `response.json()` directly.
 - `ApiFetchClient.request` (fetch transport) now passes `response.clone()` to `onResponse` instead of the original response.

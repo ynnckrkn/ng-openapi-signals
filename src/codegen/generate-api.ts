@@ -700,6 +700,13 @@ function collectType(type: string, output: Set<string>): void {
     return;
   }
 
+  // Unwrap a single surrounding pair of parentheses so that array-of-union
+  // types like `('A' | 'B' | 'C')[]` are recursed into correctly: strip `[]`
+  // first → `('A' | 'B' | 'C')` → unwrap parens → union split branch.
+  if (type.startsWith('(') && type.endsWith(')')) {
+    type = type.slice(1, -1);
+  }
+
   const primitives = new Set([
     'string',
     'number',
