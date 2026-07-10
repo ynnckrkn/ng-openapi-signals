@@ -54,6 +54,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Fixed
 
 - **Header params in mutation methods**: `generateHeaderExpression` now wraps header param values with `readSignalOrValue()` for mutation methods (POST/PUT/PATCH/DELETE). Header values passed as signals are unwrapped before being merged into the request `headers` object. GET resource methods remain unchanged (header values are already resolved in the `paramsFactory`).
+- **Deprecated `statusText` in httpClient transport**: `toApiErrorFromHttpErrorResponse` no longer reads the deprecated `HttpErrorResponse.statusText` property, which Angular marks as `@deprecated` because it incorrectly remains `'OK'` with HTTP/2+. The generated `ApiError.statusText` is now set to an empty string for the `httpClient` transport; the reliable `status` (numeric status code) is preserved. The `fetch` transport is unaffected.
 
 ## [0.6.2] - 2026-07-06
 

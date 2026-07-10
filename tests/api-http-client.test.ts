@@ -48,11 +48,7 @@ function httpResponse<T>(body: T, status: number): HttpResponseStub<T> {
   return {status, body};
 }
 
-function httpError(
-  status: number,
-  statusText: string,
-  error: unknown,
-): HttpErrorResponseStub {
+function httpError(status: number, statusText: string, error: unknown): HttpErrorResponseStub {
   return {
     status,
     statusText,
@@ -87,7 +83,9 @@ interface ApiRequestContext {
 }
 
 type ApiAuthHook = () => Record<string, string> | Promise<Record<string, string>>;
-type ApiErrorMapper = (error: HttpErrorResponseStub) => Promise<ApiError | Error> | ApiError | Error;
+type ApiErrorMapper = (
+  error: HttpErrorResponseStub,
+) => Promise<ApiError | Error> | ApiError | Error;
 type ApiRequestHook = (request: ApiRequestContext) => void | Promise<void>;
 type ApiResponseHook = (response: HttpResponseStub<unknown>) => void | Promise<void>;
 
@@ -135,7 +133,11 @@ function appendQueryParam(
   }
 }
 
-function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown | QueryParamOptions>): string {
+function buildUrl(
+  baseUrl: string,
+  path: string,
+  query?: Record<string, unknown | QueryParamOptions>,
+): string {
   const url = new URL(path, baseUrl);
 
   for (const [key, raw] of Object.entries(query ?? {})) {
@@ -183,13 +185,13 @@ function mapResponseType(
 function toApiErrorFromHttpErrorResponse(error: HttpErrorResponseStub): ApiError {
   return {
     status: error.status,
-    statusText: error.statusText,
+    statusText: '', // statusText from HttpErrorResponse is deprecated
     body: error.error,
     headers: error.headers,
   };
 }
 
-function prepareBody(options: ApiRequestOptions): { body: unknown; contentType?: string } {
+function prepareBody(options: ApiRequestOptions): {body: unknown; contentType?: string} {
   if (options.formData !== undefined) {
     if (options.contentType === 'application/x-www-form-urlencoded') {
       const params = new URLSearchParams();
@@ -267,7 +269,9 @@ function createClient(deps: ClientDeps) {
           headers: context.headers,
           ...(context.body !== undefined ? {body: context.body} : {}),
           observe: 'response',
-          ...(responseType ? {responseType: responseType as 'json' | 'text' | 'blob' | 'arraybuffer'} : {}),
+          ...(responseType
+            ? {responseType: responseType as 'json' | 'text' | 'blob' | 'arraybuffer'}
+            : {}),
           ...(options.signal ? {signal: options.signal} : {}),
         })
         .toPromise()) as HttpResponseStub<unknown>;
@@ -494,7 +498,7 @@ describe('ApiHttpClient request logic', () => {
 
       await expect(client.request({method: 'GET', path: '/users/999'})).rejects.toMatchObject({
         status: 404,
-        statusText: 'Not Found',
+        statusText: '',
       });
     });
 
@@ -507,9 +511,7 @@ describe('ApiHttpClient request logic', () => {
         http: mockHttpError(error),
       });
 
-      await expect(client.request({method: 'GET', path: '/secret'})).rejects.toThrow(
-        'Custom 403',
-      );
+      await expect(client.request({method: 'GET', path: '/secret'})).rejects.toThrow('Custom 403');
     });
   });
 

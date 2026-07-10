@@ -16,7 +16,7 @@ export interface ApiError {
 export function toApiErrorFromHttpErrorResponse(error: HttpErrorResponse): ApiError {
   return {
     status: error.status,
-    statusText: error.statusText,
+    statusText: '',  // statusText from HttpErrorResponse is deprecated
     body: error.error,
     headers: error.headers
   };
