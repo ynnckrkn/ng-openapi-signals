@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-10
+
 ### Fixed
 
 - **Array-of-enum type parenthesization**: Inline enum arrays (e.g. a property `types: array<string, enum>`) were generated as `'A' | 'B' | 'C'[]` — the `[]` bound only to the last union member instead of the whole union. `arrayToTsType` in `codegen/schema-to-ts.ts` now wraps union/intersection inner types in parentheses before appending `[]`, producing `('A' | 'B' | 'C')[]`. `collectType` in `generate-models.ts` was updated to unwrap outer parentheses during import collection so parenthesized array-of-union types are recursed into correctly. Named enum refs (`UserStatus[]`) and tuples are unaffected.
