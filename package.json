@@ -4,12 +4,12 @@
   "description": "Signal-first OpenAPI client generator for Angular using resource() and fetch().",
   "type": "module",
   "bin": {
-    "ng-openapi-signals": "./dist/cli.js"
+    "ng-openapi-signals": "./dist/cli.mjs"
   },
   "exports": {
     "./config": {
-      "import": "./dist/config.js",
-      "types": "./dist/config.d.ts"
+      "import": "./dist/config.mjs",
+      "types": "./dist/config.d.mts"
     }
   },
   "files": [
@@ -19,13 +19,13 @@
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
-    "build": "tsup",
+    "build": "tsdown",
     "test": "vitest",
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "generate:example": "npm run build && node dist/cli.js generate --input examples/openapi.yml --output examples/generated",
-    "generate:example:config": "npm run build && node dist/cli.js generate --config ng-openapi-signals.config.ts"
+    "generate:example": "npm run build && node dist/cli.mjs generate --config ng-openapi-signals.config.ts",
+    "check:example": "npm run build && node dist/cli.mjs generate --config ng-openapi-signals.config.ts --check"
   },
   "keywords": [
     "angular",
@@ -56,7 +56,7 @@
     "@types/node": "^26.1.0",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
-    "tsup": "^8.5.1",
+    "tsdown": "^0.22.5",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.1",
@@ -66,6 +66,6 @@
     "@angular/core": ">=22.0.0"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   }
 }

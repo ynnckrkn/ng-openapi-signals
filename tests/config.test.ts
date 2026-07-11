@@ -212,14 +212,14 @@ describe('config', () => {
   describe('validateConfig', () => {
     it('throws when input is missing', () => {
       expect(() => validateConfig({...DEFAULT_CONFIG, input: ''})).toThrow(
-        'No input path provided',
+        'no input path provided',
       );
     });
 
     it('throws when output is missing', () => {
       expect(() =>
         validateConfig({...DEFAULT_CONFIG, input: './openapi.json', output: ''}),
-      ).toThrow('No output path provided');
+      ).toThrow('no output path provided');
     });
 
     it('does not throw when input and output are set', () => {
@@ -236,7 +236,7 @@ describe('config', () => {
           output: './out',
           runtime: {defaultHeaders: 'not-an-object' as unknown as Record<string, string>},
         }),
-      ).toThrow('Invalid runtime.defaultHeaders');
+      ).toThrow('runtime.defaultHeaders must be an object');
     });
 
     it('throws when runtime.defaultHeaders has a non-string value', () => {
@@ -258,7 +258,7 @@ describe('config', () => {
           output: './out',
           runtime: {responseTypeHints: 'yes' as unknown as boolean},
         }),
-      ).toThrow('Invalid runtime.responseTypeHints');
+      ).toThrow('runtime.responseTypeHints must be a boolean');
     });
 
     it('does not throw for valid runtime config', () => {
@@ -302,7 +302,7 @@ describe('config', () => {
           output: './out',
           runtime: {transport: 'axios' as unknown as 'fetch'},
         }),
-      ).toThrow('Invalid runtime.transport');
+      ).toThrow('invalid runtime.transport');
     });
 
     it('throws when defaultQueryStyle is invalid', () => {
@@ -313,7 +313,7 @@ describe('config', () => {
           output: './out',
           runtime: {defaultQueryStyle: 'invalid' as unknown as 'form'},
         }),
-      ).toThrow('Invalid runtime.defaultQueryStyle');
+      ).toThrow('invalid runtime.defaultQueryStyle');
     });
 
     it('throws when defaultQueryExplode is not a boolean', () => {
@@ -324,7 +324,7 @@ describe('config', () => {
           output: './out',
           runtime: {defaultQueryExplode: 'yes' as unknown as boolean},
         }),
-      ).toThrow('Invalid runtime.defaultQueryExplode');
+      ).toThrow('runtime.defaultQueryExplode must be a boolean');
     });
 
     it('throws when preferContentType is not a string', () => {
@@ -335,7 +335,7 @@ describe('config', () => {
           output: './out',
           runtime: {preferContentType: 123 as unknown as string},
         }),
-      ).toThrow('Invalid runtime.preferContentType');
+      ).toThrow('runtime.preferContentType must be a string');
     });
 
     it('does not throw for valid new runtime config', () => {

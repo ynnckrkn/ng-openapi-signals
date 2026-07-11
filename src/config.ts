@@ -147,19 +147,19 @@ function mergeRuntime(
 export function validateConfig(config: GeneratorConfig): void {
   if (!config.input) {
     throw new Error(
-      'No input path provided. Set it via --input, in the config file, or ng-openapi-signals.config.ts.',
+      'Configuration error: no input path provided. Set it via --input, in the config file, or ng-openapi-signals.config.ts.',
     );
   }
 
   if (!config.output) {
     throw new Error(
-      'No output path provided. Set it via --output, in the config file, or ng-openapi-signals.config.ts.',
+      'Configuration error: no output path provided. Set it via --output, in the config file, or ng-openapi-signals.config.ts.',
     );
   }
 
   if (config.groupBy !== 'tag' && config.groupBy !== 'path') {
     throw new Error(
-      `Invalid groupBy value: '${config.groupBy}'. Must be 'tag' or 'path'.`,
+      `Configuration error: invalid groupBy value '${config.groupBy}'. Must be 'tag' or 'path'.`,
     );
   }
 
@@ -172,14 +172,14 @@ export function validateConfig(config: GeneratorConfig): void {
       Array.isArray(runtime.defaultHeaders)
     ) {
       throw new Error(
-        'Invalid runtime.defaultHeaders: must be an object of string keys to string values.',
+        'Configuration error: runtime.defaultHeaders must be an object of string keys to string values.',
       );
     }
 
     for (const [key, value] of Object.entries(runtime.defaultHeaders)) {
       if (typeof value !== 'string') {
         throw new Error(
-          `Invalid runtime.defaultHeaders: value for '${key}' must be a string, got ${typeof value}.`,
+          `Configuration error: runtime.defaultHeaders value for '${key}' must be a string, got ${typeof value}.`,
         );
       }
     }
@@ -190,7 +190,7 @@ export function validateConfig(config: GeneratorConfig): void {
     typeof runtime.responseTypeHints !== 'boolean'
   ) {
     throw new Error(
-      'Invalid runtime.responseTypeHints: must be a boolean.',
+      'Configuration error: runtime.responseTypeHints must be a boolean.',
     );
   }
 
@@ -200,7 +200,7 @@ export function validateConfig(config: GeneratorConfig): void {
     runtime.transport !== 'httpClient'
   ) {
     throw new Error(
-      `Invalid runtime.transport: '${runtime.transport}'. Must be 'fetch' or 'httpClient'.`,
+      `Configuration error: invalid runtime.transport '${runtime.transport}'. Must be 'fetch' or 'httpClient'.`,
     );
   }
 
@@ -209,7 +209,7 @@ export function validateConfig(config: GeneratorConfig): void {
     !isQueryStyle(runtime.defaultQueryStyle)
   ) {
     throw new Error(
-      `Invalid runtime.defaultQueryStyle: '${runtime.defaultQueryStyle}'. Must be 'form', 'spaceDelimited', 'pipeDelimited', or 'deepObject'.`,
+      `Configuration error: invalid runtime.defaultQueryStyle '${runtime.defaultQueryStyle}'. Must be 'form', 'spaceDelimited', 'pipeDelimited', or 'deepObject'.`,
     );
   }
 
@@ -218,7 +218,7 @@ export function validateConfig(config: GeneratorConfig): void {
     typeof runtime.defaultQueryExplode !== 'boolean'
   ) {
     throw new Error(
-      'Invalid runtime.defaultQueryExplode: must be a boolean.',
+      'Configuration error: runtime.defaultQueryExplode must be a boolean.',
     );
   }
 
@@ -227,7 +227,7 @@ export function validateConfig(config: GeneratorConfig): void {
     typeof runtime.preferContentType !== 'string'
   ) {
     throw new Error(
-      'Invalid runtime.preferContentType: must be a string.',
+      'Configuration error: runtime.preferContentType must be a string.',
     );
   }
 }

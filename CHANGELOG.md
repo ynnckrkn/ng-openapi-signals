@@ -7,13 +7,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **`--dry-run` CLI mode**: Generates the client in memory and prints the file list (path + line count) without writing to disk. Useful for previewing what a spec change would produce.
+- **`--check` CLI mode**: Compares the in-memory generated output against the files on disk and exits with code 1 on outdated or missing files. Stale files (on disk but no longer in the spec) are reported as warnings. Intended for CI pipelines to verify the generated client is up to date.
+- **`--verbose` CLI flag**: Shows detailed progress and the full file list on success. When not set, the CLI stays compact (success/error only) for deterministic CI logs. Stack traces are only shown in verbose mode.
+- **`check:example` npm script**: Runs the generator in `--check` mode against the example output — a regression check that the generated example is current.
+- **`examples/usage/` snippets**: Five standalone, commented `.ts` example files covering `resource()` GET usage, promise-based mutations, auth/middleware setup, `httpClient` transport setup, and multipart file upload. Not included in the npm package.
+
+### Changed
+
+- **`src/generate.ts` refactored** into three pure functions: `generateFiles()` (core generation, no I/O, no Prettier), `formatFiles()` (Prettier + auto-generated header, idempotent), and `writeFiles()` (disk I/O). `generate()` is now a thin wrapper — no breaking change. `generateFiles` and `formatFiles` are exported so `--dry-run` and `--check` reuse the same code path.
+- **CLI output**: The CLI now uses a minimal logger (`src/logger.ts`) writing to `stderr` with optional ANSI colors (disabled when piped). Success, warning, error and detail (verbose-only) levels are supported.
+- **Error messages** in `src/openapi.ts` and `src/config.ts` `validateConfig` now include clear prefixes and context: `OpenAPI input file not found: '<path>'`, `Failed to parse OpenAPI document '<path>': <reason>` (with `cause`), and `Configuration error: ...` for all config validation failures.
+- **Node.js engine requirement lowered from 24 to 22**: The `engines.node` field in `package.json`, the build target in the bundler config, and the README requirements were updated from `>=24.0.0` to `>=22.0.0`. The codebase does not use any Node 24-specific APIs.
+- **Bundler migrated from `tsup` to `tsdown`**: Replaced `tsup` with `tsdown` (v0.22.5), the Rolldown-powered library bundler. The config file was renamed from `tsup.config.ts` to `tsdown.config.ts` with equivalent options. Since `tsdown` emits `.mjs`/`.d.mts` extensions for ESM output (instead of `tsup`'s `.js`/`.d.ts`), the `bin`, `exports`, and npm script paths in `package.json` were updated accordingly. Build is now significantly faster.
+
+### Tests
+
+- **`tests/dry-run.test.ts`**: 3 tests for `generateFiles`/`formatFiles` — non-empty file map without disk access, header added and formatted, and `formatFiles` idempotency.
+- **`tests/check.test.ts`**: 6 tests for `checkFiles` — all matched, outdated, missing, stale (non-failing), missing directory, and byte-level whitespace drift.
+- **`tests/error-messages.test.ts`**: 7 tests for `loadOpenApi` and `validateConfig` error messages — missing input, invalid OpenAPI, missing `paths`, and `Configuration error:` prefixes for input/output/groupBy.
+- **`tests/config.test.ts`**: Updated existing `validateConfig` assertions to match the new `Configuration error:` prefixed messages.
+
 ## [0.7.1] - 2026-07-10
 
 ### Fixed
 
 - **Array-of-enum type parenthesization**: Inline enum arrays (e.g. a property `types: array<string, enum>`) were generated as `'A' | 'B' | 'C'[]` — the `[]` bound only to the last union member instead of the whole union. `arrayToTsType` in `codegen/schema-to-ts.ts` now wraps union/intersection inner types in parentheses before appending `[]`, producing `('A' | 'B' | 'C')[]`. `collectType` in `generate-models.ts` was updated to unwrap outer parentheses during import collection so parenthesized array-of-union types are recursed into correctly. Named enum refs (`UserStatus[]`) and tuples are unaffected.
 - **`default` response as fallback return type**: Operations with only a `default` response (no explicit 2xx codes) — common in NestJS-generated specs — were generated as `Promise<void>` / `request<void>`, ignoring the schema defined under `default`. `extractResponseType` in `generate-api.ts` now evaluates the `default` response's schema as a fallback when no 2xx schema is collected, so endpoints like `POST /api/v1/auth/login` resolve to their concrete DTO. Endpoints with explicit 2xx codes are unaffected — `default` is never unioned into them.
-- **`body: null` serialized as `"null"` [G] 11**: `prepareBody` in the fetch and httpClient runtime templates treated `null` as a defined body, producing `JSON.stringify(null)` → the string `"null"` sent with `Content-Type: application/json`. The guard is now `body !== undefined && body !== null`, so a `null` body results in no body being sent (matching the existing `formData` branch behavior).
+- **`body: null` serialized as `"null"`**: `prepareBody` in the fetch and httpClient runtime templates treated `null` as a defined body, producing `JSON.stringify(null)` → the string `"null"` sent with `Content-Type: application/json`. The guard is now `body !== undefined && body !== null`, so a `null` body results in no body being sent (matching the existing `formData` branch behavior).
 - **Empty 200 body with JSON content-type throws**: A `200` response with `Content-Type: application/json` and an empty body caused `response.json()` to throw a `SyntaxError`. The fetch runtime now uses a `parseJson` helper that reads the body as text first, returns `undefined` for empty bodies, and only calls `JSON.parse` on non-empty text. Both the explicit `responseType: 'json'` path and the content-type sniffing fallback use this safe method.
 - **`onResponse` hook consuming the body**: The `onResponse` hook received the raw `Response` before `parseBody` ran; if the hook called `await response.json()` / `.text()` / `.blob()`, the subsequent `parseBody` failed with "body already consumed." The fetch runtime now passes `response.clone()` to the hook, so consumers can safely inspect the clone's body without interfering with the runtime's body parsing. The `ApiResponseHook` docstring in both `providers-fetch.ts` and `providers-http-client.ts` was updated to document that the hook receives a clone and warn about one-shot body consumption.
 

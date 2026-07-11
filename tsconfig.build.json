@@ -4,7 +4,7 @@
     "lib": ["ES2024", "DOM"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "rootDir": ".",
+    "rootDir": "./src",
     "outDir": "./dist",
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -12,8 +12,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "declaration": true,
-    "noEmit": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

@@ -31,7 +31,7 @@ GET endpoints are generated as Angular `resource()` APIs, while mutating endpoin
 
 ## Requirements
 
-- Node.js 24 or newer
+- Node.js 22 or newer
 - Angular 22 or newer
 - TypeScript
 - OpenAPI 3.x JSON or YAML specification
@@ -175,6 +175,27 @@ ng-openapi-signals generate --input <openapi-file> --output <output-directory>
 | `--default-query-style <style>`   | Default query param style: form, spaceDelimited, pipeDelimited, or deepObject |
 | `--default-query-explode <bool>` | Default query param explode (true/false)                      |
 | `--prefer-content-type <type>`   | Preferred request content type when multiple are offered       |
+| `--dry-run`                       | Print the files that would be generated without writing to disk |
+| `--check`                         | Verify generated output is up to date (exits 1 on mismatch; for CI) |
+| `--verbose`                       | Show detailed progress and file lists                         |
+
+### CI: verify generated output
+
+Use `--check` in CI to verify the generated client is up to date:
+
+```bash
+ng-openapi-signals generate --input ./openapi.json --output ./src/generated/api --check
+```
+
+The command exits with code `1` when generated files are outdated or missing. Stale files (on disk but no longer in the spec) are reported as warnings but do not fail the check.
+
+### Preview without writing: `--dry-run`
+
+```bash
+ng-openapi-signals generate --input ./openapi.json --output ./src/generated/api --dry-run --verbose
+```
+
+Generates the client in memory and lists the files (path + line count) without touching disk.
 
 ### Recommended: use a config file
 
@@ -252,6 +273,18 @@ await this.usersApi.createUser({
 ```
 
 > See [`RUNTIME.md`](./RUNTIME.md) for full details on `MaybeSignal<T>`, response parsing, and more.
+
+### Example snippets
+
+The repository includes standalone, commented example files in [`examples/usage/`](./examples/usage/):
+
+- `resource-usage.ts` — GET endpoint with `resource()` and signals
+- `mutation-usage.ts` — POST/PUT/PATCH/DELETE as Promises
+- `auth-interceptor.ts` — auth headers and fetch middleware
+- `http-client-usage.ts` — `httpClient` transport setup
+- `multipart-upload.ts` — file upload with `FormData`
+
+These are illustrative only — adjust the import paths to your generated client directory. They are not included in the npm package.
 
 ---
 

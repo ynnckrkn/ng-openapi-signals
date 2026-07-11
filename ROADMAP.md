@@ -69,15 +69,17 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 
 ## 0.8.x - Developer Experience
 
-- Add better CLI output.
-- Add `--watch` mode.
-- Add `--dry-run` mode.
-- Add `--check` mode for CI.
-- Improve error messages.
-- Add more example projects.
-- Add Angular example app.
+- [x] Add better CLI output.
+- [x] Add `--dry-run` mode.
+- [x] Add `--check` mode for CI.
+- [x] Improve error messages.
+- [x] Add more example code snippets.
 
-## 0.9.x - Testing and Quality
+## 0.9.x - Schema Transformations
+
+- Add built-in transformers for dates.
+
+## 0.10.x - Testing and Quality
 
 - Add fixture-based generator tests.
 - Add snapshot tests for generated output.

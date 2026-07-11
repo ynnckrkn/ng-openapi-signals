@@ -1,11 +1,11 @@
-import {defineConfig} from 'tsup';
+import {defineConfig} from 'tsdown';
 
 export default defineConfig({
   entry: ['src/cli.ts', 'src/config.ts'],
   format: ['esm'],
   platform: 'node',
-  target: 'node24',
-  tsconfig: 'tsconfig.dts.json',
+  target: 'node22',
+  tsconfig: 'tsconfig.build.json',
   dts: true,
   clean: true,
   sourcemap: false,

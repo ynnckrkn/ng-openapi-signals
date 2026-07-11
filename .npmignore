@@ -9,6 +9,8 @@ AGENTS.md
 .prettierrc
 eslint.config.js
 tests
-tsconfig.test.json
+tsconfig.build.json
+tsconfig.json
 CHANGELOG.md
 RUNTIME.md
+swagger.yaml
