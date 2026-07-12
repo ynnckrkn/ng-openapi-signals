@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-12
+
 ### Added
 
 - **`--dry-run` CLI mode**: Generates the client in memory and prints the file list (path + line count) without writing to disk. Useful for previewing what a spec change would produce.
