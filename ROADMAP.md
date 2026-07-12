@@ -67,7 +67,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Add file download support.
 - [x] Add support for custom content types.
 
-## 0.8.x - Developer Experience
+## 0.8.0 - Developer Experience
 
 - [x] Add better CLI output.
 - [x] Add `--dry-run` mode.
@@ -75,11 +75,11 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Improve error messages.
 - [x] Add more example code snippets.
 
-## 0.9.x - Schema Transformations
+## 0.8.x - Schema Transformation
 
 - Add built-in transformers for dates.
 
-## 0.10.x - Testing and Quality
+## 0.9.x - Testing and Quality
 
 - Add fixture-based generator tests.
 - Add snapshot tests for generated output.
