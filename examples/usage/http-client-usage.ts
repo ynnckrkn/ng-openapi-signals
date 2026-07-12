@@ -11,11 +11,17 @@
 // Adjust the import path to point at your generated client directory.
 
 import {ApplicationConfig} from '@angular/core';
-import {provideHttpClient, withInterceptors, HttpInterceptorFn} from '@angular/common/http';
+import {
+  provideHttpClient,
+  withInterceptors,
+  HttpHandlerFn,
+  HttpInterceptorFn,
+  HttpRequest,
+} from '@angular/common/http';
 import {provideNgOpenapiSignals} from '../generated/api';
 
 // A custom interceptor example (implement as needed).
-const loggingInterceptor: HttpInterceptorFn = (req, next) => {
+const loggingInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {
   console.log('→', req.method, req.url);
   return next(req);
 };

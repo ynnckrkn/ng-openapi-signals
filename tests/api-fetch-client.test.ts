@@ -146,7 +146,7 @@ async function parseBody(
   return response.blob();
 }
 
-function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; contentType?: string } {
+function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; contentType: string | undefined } {
   // FormData takes precedence over body.
   if (options.formData !== undefined) {
     // For application/x-www-form-urlencoded, build URLSearchParams.
@@ -171,7 +171,7 @@ function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; 
         formData.append(key, String(value));
       }
     }
-    return {body: formData};
+    return {body: formData, contentType: undefined};
   }
 
   if (options.body !== undefined && options.body !== null) {
@@ -187,7 +187,7 @@ function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; 
     return {body: JSON.stringify(options.body), contentType: options.contentType ?? 'application/json'};
   }
 
-  return {body: undefined};
+  return {body: undefined, contentType: undefined};
 }
 
 function createClient(deps: ClientDeps) {

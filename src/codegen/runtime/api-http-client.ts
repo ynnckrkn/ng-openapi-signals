@@ -182,7 +182,7 @@ export class ApiHttpClient {
    * - Blob/ArrayBuffer: passes through with the provided contentType.
    * - Plain objects: passed directly; HttpClient serializes as JSON.
    */
-  private prepareBody(options: ApiRequestOptions): { body: unknown; contentType?: string } {
+  private prepareBody(options: ApiRequestOptions): { body: unknown; contentType: string | undefined } {
     // FormData takes precedence over body.
     if (options.formData !== undefined) {
       if (options.contentType === 'application/x-www-form-urlencoded') {
@@ -205,7 +205,7 @@ export class ApiHttpClient {
           formData.append(key, String(value));
         }
       }
-      return { body: formData };
+      return { body: formData, contentType: undefined };
     }
 
     if (options.body !== undefined && options.body !== null) {
@@ -222,7 +222,7 @@ export class ApiHttpClient {
       return { body: options.body, contentType: options.contentType ?? 'application/json' };
     }
 
-    return { body: undefined };
+    return { body: undefined, contentType: undefined };
   }
 
   /**

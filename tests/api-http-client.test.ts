@@ -191,7 +191,7 @@ function toApiErrorFromHttpErrorResponse(error: HttpErrorResponseStub): ApiError
   };
 }
 
-function prepareBody(options: ApiRequestOptions): {body: unknown; contentType?: string} {
+function prepareBody(options: ApiRequestOptions): {body: unknown; contentType: string | undefined} {
   if (options.formData !== undefined) {
     if (options.contentType === 'application/x-www-form-urlencoded') {
       const params = new URLSearchParams();
@@ -213,7 +213,7 @@ function prepareBody(options: ApiRequestOptions): {body: unknown; contentType?: 
         formData.append(key, String(value));
       }
     }
-    return {body: formData};
+    return {body: formData, contentType: undefined};
   }
 
   if (options.body !== undefined && options.body !== null) {
@@ -228,7 +228,7 @@ function prepareBody(options: ApiRequestOptions): {body: unknown; contentType?: 
     return {body: options.body, contentType: options.contentType ?? 'application/json'};
   }
 
-  return {body: undefined};
+  return {body: undefined, contentType: undefined};
 }
 
 function createClient(deps: ClientDeps) {

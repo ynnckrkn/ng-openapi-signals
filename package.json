@@ -24,8 +24,8 @@
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "generate:example": "npm run build && node dist/cli.mjs generate --config ng-openapi-signals.config.ts",
-    "check:example": "npm run build && node dist/cli.mjs generate --config ng-openapi-signals.config.ts --check"
+    "generate:example": "npm run build && node dist/cli.mjs generate --config examples/ng-openapi-signals.config.ts",
+    "check:example": "npm run build && node dist/cli.mjs generate --config examples/ng-openapi-signals.config.ts --check"
   },
   "keywords": [
     "angular",

@@ -83,16 +83,16 @@ describe('config', () => {
     it('provides default runtime config when no overrides given', () => {
       const config = resolveConfig({}, {});
       expect(config.runtime).toEqual(DEFAULT_RUNTIME_CONFIG);
-      expect(config.runtime.transport).toBe('fetch');
-      expect(config.runtime.defaultHeaders).toEqual({});
-      expect(config.runtime.responseTypeHints).toBe(true);
+      expect(config.runtime!.transport).toBe('fetch');
+      expect(config.runtime!.defaultHeaders).toEqual({});
+      expect(config.runtime!.responseTypeHints).toBe(true);
     });
 
     it('file runtime.defaultHeaders overrides defaults', () => {
       const config = resolveConfig({}, {
         runtime: {defaultHeaders: {'X-Client': 'ng-openapi-signals'}},
       });
-      expect(config.runtime.defaultHeaders).toEqual({'X-Client': 'ng-openapi-signals'});
+      expect(config.runtime!.defaultHeaders).toEqual({'X-Client': 'ng-openapi-signals'});
     });
 
     it('CLI runtime.defaultHeaders merges over file runtime.defaultHeaders', () => {
@@ -101,7 +101,7 @@ describe('config', () => {
         {runtime: {defaultHeaders: {'X-File': 'file'}}},
       );
       // Deep-merge: CLI keys win, file keys preserved when not overridden.
-      expect(config.runtime.defaultHeaders).toEqual({'X-Cli': 'cli', 'X-File': 'file'});
+      expect(config.runtime!.defaultHeaders).toEqual({'X-Cli': 'cli', 'X-File': 'file'});
     });
 
     it('CLI runtime.defaultHeaders overrides file keys with the same name', () => {
@@ -109,7 +109,7 @@ describe('config', () => {
         {runtime: {defaultHeaders: {'X-Shared': 'cli'}}},
         {runtime: {defaultHeaders: {'X-Shared': 'file'}}},
       );
-      expect(config.runtime.defaultHeaders).toEqual({'X-Shared': 'cli'});
+      expect(config.runtime!.defaultHeaders).toEqual({'X-Shared': 'cli'});
     });
 
     it('deep-merges runtime.defaultHeaders from file and defaults', () => {
@@ -117,12 +117,12 @@ describe('config', () => {
         runtime: {defaultHeaders: {'X-Custom': 'abc'}},
       });
       // default is {} so result equals file override
-      expect(config.runtime.defaultHeaders).toEqual({'X-Custom': 'abc'});
+      expect(config.runtime!.defaultHeaders).toEqual({'X-Custom': 'abc'});
     });
 
     it('file responseTypeHints=false overrides default true', () => {
       const config = resolveConfig({}, {runtime: {responseTypeHints: false}});
-      expect(config.runtime.responseTypeHints).toBe(false);
+      expect(config.runtime!.responseTypeHints).toBe(false);
     });
 
     it('CLI responseTypeHints overrides file', () => {
@@ -130,7 +130,7 @@ describe('config', () => {
         {runtime: {responseTypeHints: true}},
         {runtime: {responseTypeHints: false}},
       );
-      expect(config.runtime.responseTypeHints).toBe(true);
+      expect(config.runtime!.responseTypeHints).toBe(true);
     });
 
     it('preserves unrelated runtime fields when partially overridden', () => {
@@ -138,18 +138,18 @@ describe('config', () => {
         {runtime: {responseTypeHints: false}},
         {runtime: {defaultHeaders: {'X-A': 'a'}}},
       );
-      expect(config.runtime.responseTypeHints).toBe(false);
-      expect(config.runtime.defaultHeaders).toEqual({'X-A': 'a'});
+      expect(config.runtime!.responseTypeHints).toBe(false);
+      expect(config.runtime!.defaultHeaders).toEqual({'X-A': 'a'});
     });
 
     it('defaults transport to fetch when not specified', () => {
       const config = resolveConfig({}, {});
-      expect(config.runtime.transport).toBe('fetch');
+      expect(config.runtime!.transport).toBe('fetch');
     });
 
     it('file runtime.transport overrides default', () => {
       const config = resolveConfig({}, {runtime: {transport: 'httpClient'}});
-      expect(config.runtime.transport).toBe('httpClient');
+      expect(config.runtime!.transport).toBe('httpClient');
     });
 
     it('CLI runtime.transport overrides file', () => {
@@ -157,7 +157,7 @@ describe('config', () => {
         {runtime: {transport: 'fetch'}},
         {runtime: {transport: 'httpClient'}},
       );
-      expect(config.runtime.transport).toBe('fetch');
+      expect(config.runtime!.transport).toBe('fetch');
     });
 
     it('preserves unrelated runtime fields when transport is overridden', () => {
@@ -165,19 +165,19 @@ describe('config', () => {
         {runtime: {transport: 'httpClient'}},
         {runtime: {defaultHeaders: {'X-A': 'a'}, responseTypeHints: false}},
       );
-      expect(config.runtime.transport).toBe('httpClient');
-      expect(config.runtime.defaultHeaders).toEqual({'X-A': 'a'});
-      expect(config.runtime.responseTypeHints).toBe(false);
+      expect(config.runtime!.transport).toBe('httpClient');
+      expect(config.runtime!.defaultHeaders).toEqual({'X-A': 'a'});
+      expect(config.runtime!.responseTypeHints).toBe(false);
     });
 
     it('defaults defaultQueryStyle to form', () => {
       const config = resolveConfig({}, {});
-      expect(config.runtime.defaultQueryStyle).toBe('form');
+      expect(config.runtime!.defaultQueryStyle).toBe('form');
     });
 
     it('file defaultQueryStyle overrides default', () => {
       const config = resolveConfig({}, {runtime: {defaultQueryStyle: 'pipeDelimited'}});
-      expect(config.runtime.defaultQueryStyle).toBe('pipeDelimited');
+      expect(config.runtime!.defaultQueryStyle).toBe('pipeDelimited');
     });
 
     it('CLI defaultQueryStyle overrides file', () => {
@@ -185,27 +185,27 @@ describe('config', () => {
         {runtime: {defaultQueryStyle: 'spaceDelimited'}},
         {runtime: {defaultQueryStyle: 'pipeDelimited'}},
       );
-      expect(config.runtime.defaultQueryStyle).toBe('spaceDelimited');
+      expect(config.runtime!.defaultQueryStyle).toBe('spaceDelimited');
     });
 
     it('defaults defaultQueryExplode to true', () => {
       const config = resolveConfig({}, {});
-      expect(config.runtime.defaultQueryExplode).toBe(true);
+      expect(config.runtime!.defaultQueryExplode).toBe(true);
     });
 
     it('file defaultQueryExplode overrides default', () => {
       const config = resolveConfig({}, {runtime: {defaultQueryExplode: false}});
-      expect(config.runtime.defaultQueryExplode).toBe(false);
+      expect(config.runtime!.defaultQueryExplode).toBe(false);
     });
 
     it('defaults preferContentType to application/json', () => {
       const config = resolveConfig({}, {});
-      expect(config.runtime.preferContentType).toBe('application/json');
+      expect(config.runtime!.preferContentType).toBe('application/json');
     });
 
     it('file preferContentType overrides default', () => {
       const config = resolveConfig({}, {runtime: {preferContentType: 'multipart/form-data'}});
-      expect(config.runtime.preferContentType).toBe('multipart/form-data');
+      expect(config.runtime!.preferContentType).toBe('multipart/form-data');
     });
   });
 

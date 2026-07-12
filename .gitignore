@@ -2,5 +2,5 @@ node_modules
 dist
 examples/generated
 AGENTS.md
-ng-openapi-signals.config.ts
+openapi-signals.config.ts
 swagger.yaml

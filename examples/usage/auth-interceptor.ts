@@ -7,7 +7,7 @@
 // Adjust the import path to point at your generated client directory.
 
 import {ApplicationConfig} from '@angular/core';
-import {provideNgOpenapiSignals} from '../generated/api';
+import {provideNgOpenapiSignals, ApiRequestContext} from '../generated/api';
 
 // In a real app this would come from an auth service or signal.
 function getAuthToken(): string {
@@ -31,7 +31,7 @@ export const appConfig: ApplicationConfig = {
 
       // Onion-style fetch middleware: (request, next) => response.
       middleware: [
-        async (req, next) => {
+        async (req: ApiRequestContext, next: () => Promise<Response>) => {
           console.log('→', req.init.method, req.url);
           const res = await next();
           console.log('←', res.status);
@@ -40,7 +40,7 @@ export const appConfig: ApplicationConfig = {
       ],
 
       // Called before the middleware pipeline runs. Can mutate the request.
-      onRequest: (ctx) => {
+      onRequest: (ctx: ApiRequestContext) => {
         ctx.init.headers = {
           ...ctx.init.headers,
           'X-Trace-Id': crypto.randomUUID(),
@@ -48,7 +48,7 @@ export const appConfig: ApplicationConfig = {
       },
 
       // Called after a successful response is received.
-      onResponse: (res) => console.log('response', res.status),
+      onResponse: (res: Response) => console.log('response', res.status),
     }),
   ],
 };
