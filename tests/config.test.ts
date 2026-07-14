@@ -207,6 +207,24 @@ describe('config', () => {
       const config = resolveConfig({}, {runtime: {preferContentType: 'multipart/form-data'}});
       expect(config.runtime!.preferContentType).toBe('multipart/form-data');
     });
+
+    it('defaults signalMutations to false', () => {
+      const config = resolveConfig({}, {});
+      expect(config.runtime!.signalMutations).toBe(false);
+    });
+
+    it('file signalMutations=true overrides default false', () => {
+      const config = resolveConfig({}, {runtime: {signalMutations: true}});
+      expect(config.runtime!.signalMutations).toBe(true);
+    });
+
+    it('CLI signalMutations overrides file', () => {
+      const config = resolveConfig(
+        {runtime: {signalMutations: false}},
+        {runtime: {signalMutations: true}},
+      );
+      expect(config.runtime!.signalMutations).toBe(false);
+    });
   });
 
   describe('validateConfig', () => {
@@ -336,6 +354,17 @@ describe('config', () => {
           runtime: {preferContentType: 123 as unknown as string},
         }),
       ).toThrow('runtime.preferContentType must be a string');
+    });
+
+    it('throws when runtime.signalMutations is not a boolean', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {signalMutations: 'yes' as unknown as boolean},
+        }),
+      ).toThrow('runtime.signalMutations must be a boolean');
     });
 
     it('does not throw for valid new runtime config', () => {

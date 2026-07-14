@@ -55,7 +55,7 @@ export function extractOperations(api: any): OperationModel[] {
         headerParams,
         responseType,
         ...(responseParser ? {responseParser} : {}),
-        ...(requestBody ? {requestBody, requestBodyType: requestBody.type} : {}),
+        ...(requestBody ? {requestBody} : {}),
       });
     }
   }
@@ -104,6 +104,8 @@ function generateService(
       op.pathParams.length + op.queryParams.length + op.headerParams.length > 0,
   );
   const responseTypeHints = config.runtime?.responseTypeHints ?? true;
+  const signalMutations = config.runtime?.signalMutations === true;
+  const hasMutations = operations.some((op) => op.method !== 'get');
   const transport = config.runtime?.transport ?? 'fetch';
   const clientClassName = transport === 'httpClient' ? 'ApiHttpClient' : 'ApiFetchClient';
   const clientImportPath =
@@ -118,6 +120,10 @@ function generateService(
     hasGetsWithParams || hasMutationsWithParams
       ? `import { MaybeSignal, readSignalOrValue } from '../signal-utils';\n`
       : '';
+  const mutationUtilImport =
+    signalMutations && hasMutations
+      ? `import { Mutation, createMutation } from '../mutation-utils';\n`
+      : '';
   const modelImportLine = modelImports ? `${modelImports}\n` : '';
 
   const methods = operations
@@ -126,13 +132,18 @@ function generateService(
         return generateResourceMethod(operation, responseTypeHints);
       }
 
-      return generateMutationMethod(operation, responseTypeHints);
+      const promiseMethod = generateMutationMethod(operation, responseTypeHints);
+      if (!signalMutations) {
+        return promiseMethod;
+      }
+
+      return `${promiseMethod}\n\n${generateSignalMutationMethod(operation)}`;
     })
     .join('\n\n');
 
   return `import { ${angularImports.join(', ')} } from '@angular/core';
 import { ${clientClassName} } from '${clientImportPath}';
-${signalUtilImport}${modelImportLine}
+${signalUtilImport}${mutationUtilImport}${modelImportLine}
 @Service()
 export class ${serviceName} {
   private readonly client = inject(${clientClassName});
@@ -212,7 +223,7 @@ function generateMutationMethod(operation: OperationModel, responseTypeHints: bo
   const hasParams =
     operation.pathParams.length + operation.queryParams.length + operation.headerParams.length > 0;
   const paramsType = generateParamsType(operation);
-  const bodyType = operation.requestBody?.type ?? operation.requestBodyType;
+  const bodyType = operation.requestBody?.type;
   const bodyParameter = bodyType ? `body: ${bodyType}, ` : '';
   const paramsParameter = hasParams ? `params: ${paramsType}, ` : '';
   const pathExpression = generatePathExpression(operation);
@@ -257,6 +268,45 @@ function generateMutationMethod(operation: OperationModel, responseTypeHints: bo
     return this.client.request<${operation.responseType}>({
 ${requestBody}
     });
+  }`;
+}
+
+/**
+ * Generates a signal-based `…Mutation()` method that wraps the existing
+ * Promise-based mutation method in a `createMutation()` factory, exposing
+ * `result`, `error`, `status`, `isLoading` signals and a `mutate()` function.
+ *
+ * Path/query/header params are bound at construction time (captured in the
+ * closure); the request body is passed to `mutate(body)`. The generated method
+ * delegates to the Promise-based method (no request construction is duplicated)
+ * and only applies when `runtime.signalMutations` is enabled. The Promise-based
+ * method remains available.
+ */
+function generateSignalMutationMethod(operation: OperationModel): string {
+  const hasParams =
+    operation.pathParams.length + operation.queryParams.length + operation.headerParams.length > 0;
+  const paramsType = generateParamsType(operation);
+  const bodyType = operation.requestBody?.type;
+  const paramsArg = hasParams ? `params: ${paramsType}` : '';
+  const mutationBodyType = bodyType ?? 'void';
+
+  // Build the argument list forwarded to the Promise-based method.
+  // Path/query/header params are unwrapped from MaybeSignal before forwarding,
+  // since the Promise method consumes plain (non-signal) values.
+  const forwardedArgs: string[] = [];
+  if (bodyType) {
+    forwardedArgs.push('mutationBody');
+  }
+  if (hasParams) {
+    forwardedArgs.push(generateResourceParamsExpression(operation));
+  }
+  forwardedArgs.push('mutationSignal');
+  const forwardedCall = forwardedArgs.join(', ');
+
+  return `  ${operation.operationId}Mutation(${paramsArg}): Mutation<${mutationBodyType}, ${operation.responseType}> {
+    return createMutation<${mutationBodyType}, ${operation.responseType}>((mutationBody, mutationSignal) =>
+      this.${operation.operationId}(${forwardedCall}),
+    );
   }`;
 }
 
@@ -674,7 +724,7 @@ function collectModelImports(operations: OperationModel[]): string {
   for (const operation of operations) {
     collectType(operation.responseType, types);
 
-    const bodyType = operation.requestBody?.type ?? operation.requestBodyType;
+    const bodyType = operation.requestBody?.type;
     if (bodyType) {
       collectType(bodyType, types);
     }

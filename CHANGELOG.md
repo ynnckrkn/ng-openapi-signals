@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Signal-based mutation layer (`runtime.signalMutations`)**: Opt-in toggle (default `false`, CLI `--signal-mutations`) generating `${operationId}Mutation()` methods for POST/PUT/PATCH/DELETE that return a `Mutation` with `result`/`error`/`status`/`isLoading` signals, `mutate(body)`, and `reset()`; emits `mutation-utils.ts` runtime file; added `examples/usage/mutation-signal-usage.ts` and `mutation-signal-params-usage.ts`.
+
+### Changed
+
+- `withRuntimeDefaults` preserves all runtime fields via spread; codegen conditionally emits mutation utilities — existing Promise-based methods remain (strictly additive).
+
+### Tests
+
+- `tests/config.test.ts` and `tests/generated-api.test.ts` cover `signalMutations` default, overrides, validation, generated mutation methods, and absence by default.
+
 ## [0.8.0] - 2026-07-12
 
 ### Added

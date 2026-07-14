@@ -18,6 +18,7 @@ export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   defaultQueryStyle: 'form',
   defaultQueryExplode: true,
   preferContentType: 'application/json',
+  signalMutations: false,
 };
 
 export const DEFAULT_CONFIG: GeneratorConfig = {
@@ -103,6 +104,7 @@ function mergeRuntime(
     defaultQueryStyle: 'form',
     defaultQueryExplode: true,
     preferContentType: 'application/json',
+    signalMutations: false,
   };
 
   for (const layer of layers) {
@@ -135,6 +137,10 @@ function mergeRuntime(
 
     if (layer.preferContentType !== undefined) {
       result.preferContentType = layer.preferContentType;
+    }
+
+    if (layer.signalMutations !== undefined) {
+      result.signalMutations = layer.signalMutations;
     }
   }
 
@@ -228,6 +234,15 @@ export function validateConfig(config: GeneratorConfig): void {
   ) {
     throw new Error(
       'Configuration error: runtime.preferContentType must be a string.',
+    );
+  }
+
+  if (
+    runtime?.signalMutations !== undefined &&
+    typeof runtime.signalMutations !== 'boolean'
+  ) {
+    throw new Error(
+      'Configuration error: runtime.signalMutations must be a boolean.',
     );
   }
 }

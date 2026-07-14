@@ -71,6 +71,15 @@ export interface RuntimeConfig {
    * to prefer multipart when available.
    */
   preferContentType?: string;
+  /**
+   * When `true`, generates an additional signal-based `…Mutation()` method
+   * for every POST/PUT/PATCH/DELETE operation, alongside the existing
+   * Promise-based method. The generated `…Mutation()` returns a `Mutation`
+   * object exposing `result`, `error`, `status`, `isLoading` signals and a
+   * `mutate(body, signal?)` function. Defaults to `false` to preserve the
+   * zero-magic generation default.
+   */
+  signalMutations?: boolean;
 }
 
 export interface GeneratorConfig {
@@ -136,8 +145,6 @@ export interface OperationModel {
   responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
   /** Request body metadata (content type, multipart info). */
   requestBody?: RequestBodyModel;
-  /** @deprecated Use `requestBody.type` instead. Kept for backward compatibility. */
-  requestBodyType?: string;
 }
 
 export type SchemaModelKind = 'interface' | 'enum' | 'alias';

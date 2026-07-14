@@ -25,6 +25,7 @@ program
   .option('--default-query-style <style>', 'Default query param style: form, spaceDelimited, pipeDelimited, or deepObject')
   .option('--default-query-explode <bool>', 'Default query param explode (true/false)')
   .option('--prefer-content-type <type>', 'Preferred request content type when multiple are offered')
+  .option('--signal-mutations', 'Generate signal-based …Mutation() methods for POST/PUT/PATCH/DELETE (default: false)')
   .option('--dry-run', 'Print the files that would be generated without writing to disk')
   .option('--check', 'Verify generated output is up to date (exits 1 on mismatch; for CI)')
   .option('--verbose', 'Show detailed progress and file lists')
@@ -52,6 +53,9 @@ program
           : {}),
         ...(options.preferContentType !== undefined
           ? {runtime: {preferContentType: options.preferContentType}}
+          : {}),
+        ...(options.signalMutations === true
+          ? {runtime: {signalMutations: true}}
           : {}),
       };
 

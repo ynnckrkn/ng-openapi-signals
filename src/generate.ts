@@ -20,6 +20,7 @@ function withRuntimeDefaults(config: GeneratorConfig): GeneratorConfig {
   return {
     ...config,
     runtime: {
+      ...runtime,
       transport: runtime.transport ?? 'fetch',
       defaultHeaders: runtime.defaultHeaders ?? {},
       responseTypeHints: runtime.responseTypeHints ?? true,
@@ -122,16 +123,20 @@ export async function generate(config: GeneratorConfig): Promise<void> {
 
 function generateIndexFile(config: GeneratorConfig): string {
   const transport = config.runtime?.transport ?? 'fetch';
+  const signalMutations = config.runtime?.signalMutations === true;
   const clientExport =
     transport === 'httpClient'
       ? "export * from './api-http-client';"
       : "export * from './api-fetch-client';";
+  const mutationExport = signalMutations
+    ? "export * from './mutation-utils';\n"
+    : '';
 
   return `export * from './providers';
 export * from './api-error';
 ${clientExport}
 export * from './signal-utils';
-export * from './models';
+${mutationExport}export * from './models';
 export * from './resources';
 `;
 }

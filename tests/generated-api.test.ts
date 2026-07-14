@@ -109,3 +109,95 @@ describe('generated API with httpClient transport', () => {
     expect(content).toContain('body: CreateUserRequest');
   });
 });
+
+describe('generated API with signal mutations', () => {
+  const MUT_OUTPUT_DIR = join(process.cwd(), 'tests', '.tmp-api-mut');
+
+  beforeEach(async () => {
+    await rm(MUT_OUTPUT_DIR, {recursive: true, force: true});
+    await generate({
+      input: 'examples/openapi.json',
+      output: MUT_OUTPUT_DIR,
+      clean: true,
+      groupBy: 'tag',
+      runtime: {signalMutations: true},
+    });
+  });
+
+  afterEach(async () => {
+    await rm(MUT_OUTPUT_DIR, {recursive: true, force: true});
+  });
+
+  it('imports Mutation and createMutation from mutation-utils', async () => {
+    const content = await readFile(join(MUT_OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');
+    expect(content).toContain('Mutation');
+    expect(content).toContain('createMutation');
+    expect(content).toContain("from '../mutation-utils'");
+  });
+
+  it('generates createUserMutation alongside createUser', async () => {
+    const content = await readFile(join(MUT_OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');
+    expect(content).toContain(
+      'createUser(body: CreateUserRequest, signal?: AbortSignal): Promise<User>',
+    );
+    expect(content).toContain('createUserMutation(): Mutation<CreateUserRequest, User>');
+    expect(content).toContain('createMutation<CreateUserRequest, User>');
+  });
+
+  it('generates uploadUserAvatarMutation with unwrapped path params', async () => {
+    const content = await readFile(join(MUT_OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');
+    expect(content).toContain('uploadUserAvatarMutation(params: {');
+    expect(content).toContain(
+      'Mutation<UploadUserAvatarRequest2, UploadUserAvatarResponse>',
+    );
+    expect(content).toContain('readSignalOrValue(params.id)');
+  });
+
+  it('emits mutation-utils.ts runtime file', async () => {
+    const content = await readFile(join(MUT_OUTPUT_DIR, 'mutation-utils.ts'), 'utf8');
+    expect(content).toContain('export interface Mutation<TBody, TResult>');
+    expect(content).toContain('export function createMutation<TBody, TResult>');
+    expect(content).toContain('isLoading');
+    expect(content).toContain('mutate');
+  });
+
+  it('exports mutation-utils from index.ts', async () => {
+    const content = await readFile(join(MUT_OUTPUT_DIR, 'index.ts'), 'utf8');
+    expect(content).toContain("export * from './mutation-utils';");
+  });
+});
+
+describe('generated API without signal mutations (default)', () => {
+  const DEFAULT_OUTPUT_DIR = join(process.cwd(), 'tests', '.tmp-api-default');
+
+  beforeEach(async () => {
+    await rm(DEFAULT_OUTPUT_DIR, {recursive: true, force: true});
+    await generate({
+      input: 'examples/openapi.json',
+      output: DEFAULT_OUTPUT_DIR,
+      clean: true,
+      groupBy: 'tag',
+    });
+  });
+
+  afterEach(async () => {
+    await rm(DEFAULT_OUTPUT_DIR, {recursive: true, force: true});
+  });
+
+  it('does not generate …Mutation() methods by default', async () => {
+    const content = await readFile(join(DEFAULT_OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');
+    expect(content).not.toContain('createUserMutation');
+    expect(content).not.toContain('createMutation');
+  });
+
+  it('does not emit mutation-utils.ts by default', async () => {
+    await expect(
+      readFile(join(DEFAULT_OUTPUT_DIR, 'mutation-utils.ts'), 'utf8'),
+    ).rejects.toThrow();
+  });
+
+  it('does not export mutation-utils from index.ts by default', async () => {
+    const content = await readFile(join(DEFAULT_OUTPUT_DIR, 'index.ts'), 'utf8');
+    expect(content).not.toContain("export * from './mutation-utils';");
+  });
+});

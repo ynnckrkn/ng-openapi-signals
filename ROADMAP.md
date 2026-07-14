@@ -58,7 +58,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Document the trade-offs and migration path between the `fetch` and `httpClient` transports.
 - [x] Add tests covering both runtime transports.
 
-## 0.7.x - Advanced Request Support
+## 0.7.0 - Advanced Request Support
 
 - [x] Add advanced query parameter serialization.
 - [x] Support OpenAPI parameter styles.
@@ -75,11 +75,12 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Improve error messages.
 - [x] Add more example code snippets.
 
-## 0.8.x - Schema Transformation
+## 0.9.0 - Signal-based Mutation and Date Transformation
 
+- [x] Add signal based Mutation-Layer for POST/PUT/PATCH/DELETE (optional).
 - Add built-in transformers for dates.
 
-## 0.9.x - Testing and Quality
+## 0.10.x - Testing and Quality
 
 - Add fixture-based generator tests.
 - Add snapshot tests for generated output.
