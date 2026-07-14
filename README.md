@@ -28,6 +28,7 @@ GET endpoints are generated as Angular `resource()` APIs, while mutating endpoin
 - Custom error mapping
 - Request and response hooks
 - Base URL configuration via `provideNgOpenapiSignals()`
+- Optional signal-based mutations — reactive `result`/`error`/`status`/`isLoading` signals for POST/PUT/PATCH/DELETE
 
 ## Requirements
 
@@ -175,6 +176,7 @@ ng-openapi-signals generate --input <openapi-file> --output <output-directory>
 | `--default-query-style <style>`   | Default query param style: form, spaceDelimited, pipeDelimited, or deepObject |
 | `--default-query-explode <bool>` | Default query param explode (true/false)                      |
 | `--prefer-content-type <type>`   | Preferred request content type when multiple are offered       |
+| `--signal-mutations`             | Enable signal-based mutation methods (default: false)            |
 | `--dry-run`                       | Print the files that would be generated without writing to disk |
 | `--check`                         | Verify generated output is up to date (exits 1 on mismatch; for CI) |
 | `--verbose`                       | Show detailed progress and file lists                         |
@@ -258,6 +260,7 @@ ng-openapi-signals generate \
 
 - **GET endpoints** → Angular `resource()` APIs (accept plain values or signals)
 - **POST / PUT / PATCH / DELETE** → Promise-based `fetch()` methods
+- **Signal-based mutations** (opt-in via `runtime.signalMutations`) → `${operationId}Mutation()` methods returning a `Mutation` with `result`/`error`/`status`/`isLoading` signals
 
 ```ts
 // GET — reactive resource
@@ -265,14 +268,65 @@ readonly user = this.usersApi.getUserByIdResource({
   id: this.userId,  // signal or plain value
 });
 
-// POST — promise-based mutation
+// POST — promise-based mutation (default)
 await this.usersApi.createUser({
   name: 'John Doe',
   email: 'john@example.com',
 });
 ```
 
-> See [`RUNTIME.md`](./RUNTIME.md) for full details on `MaybeSignal<T>`, response parsing, and more.
+### Signal-based mutations (opt-in)
+
+When `runtime.signalMutations` is enabled, the generator additionally emits
+a `${operationId}Mutation()` method for every POST/PUT/PATCH/DELETE endpoint,
+alongside the existing Promise-based method (strictly additive).
+
+```ts
+// Signal-based mutation — reactive state, no manual `busy` flag
+readonly creating = this.usersApi.createUserMutation();
+
+create(): void {
+  this.creating.mutate({ name: 'John Doe', email: 'john@example.com' });
+}
+
+// In the template:
+//   creating.isLoading()  → boolean signal
+//   creating.result()     → the created user (or undefined)
+//   creating.error()      → the last error (or undefined)
+//   creating.status()     → 'idle' | 'loading' | 'success' | 'error'
+//   creating.reset()      → clears result/error, returns to 'idle'
+```
+
+For endpoints with path/query/header parameters, the parameters are bound
+at construction time (captured in the closure), and only the request body
+is passed to `mutate(body)`:
+
+```ts
+readonly uploading = this.usersApi.uploadUserAvatarMutation({
+  id: this.userId,  // signal or plain value
+});
+
+upload(): void {
+  this.uploading.mutate({ file: this.file, caption: 'Profile photo' });
+}
+```
+
+Enable the feature via the config file or CLI:
+
+```ts
+// ng-openapi-signals.config.ts
+export default defineConfig({
+  input: './openapi.json',
+  output: './src/generated/api',
+  runtime: { signalMutations: true },
+});
+```
+
+```bash
+ng-openapi-signals generate --signal-mutations
+```
+
+> See [`RUNTIME.md`](./RUNTIME.md) for full details on `MaybeSignal<T>`, the `Mutation` interface, response parsing, and more.
 
 ### Example snippets
 
@@ -280,6 +334,8 @@ The repository includes standalone, commented example files in [`examples/usage/
 
 - `resource-usage.ts` — GET endpoint with `resource()` and signals
 - `mutation-usage.ts` — POST/PUT/PATCH/DELETE as Promises
+- `mutation-signal-usage.ts` — signal-based mutation (`runtime.signalMutations`)
+- `mutation-signal-params-usage.ts` — signal-based mutation with path/query/header params
 - `auth-interceptor.ts` — auth headers and fetch middleware
 - `http-client-usage.ts` — `httpClient` transport setup
 - `multipart-upload.ts` — file upload with `FormData`
@@ -296,6 +352,7 @@ The generated client includes a small runtime:
 api-fetch-client.ts   (or api-http-client.ts)
 api-error.ts
 signal-utils.ts
+mutation-utils.ts     (only when runtime.signalMutations is enabled)
 providers.ts
 ```
 
@@ -331,6 +388,7 @@ providers.ts
 | `defaultQueryStyle` | `'form' \| 'spaceDelimited' \| 'pipeDelimited' \| 'deepObject'` | `'form'` | Default query param serialization style when the spec doesn't specify `style` |
 | `defaultQueryExplode` | `boolean`               | `true`      | Default `explode` flag for query params when the spec doesn't specify it  |
 | `preferContentType` | `string`                  | `'application/json'` | Preferred content type when a request body offers multiple media types  |
+| `signalMutations`   | `boolean`                 | `false`     | Generate `${operationId}Mutation()` methods with reactive signals for POST/PUT/PATCH/DELETE |
 
 ### Using the `httpClient` transport
 

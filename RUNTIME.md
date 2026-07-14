@@ -55,6 +55,117 @@ await this.usersApi.createUser({
 
 This keeps read operations reactive while keeping write operations explicit and predictable.
 
+### Signal-based mutations (opt-in)
+
+When `runtime.signalMutations` is enabled (default `false`, CLI `--signal-mutations`),
+the generator additionally emits a `${operationId}Mutation()` method for every
+POST/PUT/PATCH/DELETE endpoint, alongside the existing Promise-based method.
+The feature is strictly additive — the Promise-based methods remain unchanged.
+
+The mutation method returns a `Mutation<TBody, TResult>` object exposing
+reactive signals:
+
+| Member     | Type                              | Description                                              |
+| ---------- | --------------------------------- | -------------------------------------------------------- |
+| `result`   | `Signal<TResult \| undefined>`    | Last successful response value (or `undefined`)          |
+| `error`    | `Signal<unknown \| undefined>`    | Last thrown error (or `undefined`)                       |
+| `status`   | `Signal<MutationStatus>`          | `'idle' \| 'loading' \| 'success' \| 'error'`            |
+| `isLoading`| `Signal<boolean>`                 | `computed(() => status() === 'loading')`                |
+| `mutate`   | `(body, signal?) => Promise<TResult>` | Triggers the request, updates signals, resolves to the result |
+| `reset`    | `() => void`                      | Clears `result`/`error` and returns `status` to `'idle'` |
+
+#### Basic usage
+
+```ts
+readonly creating = this.usersApi.createUserMutation();
+
+create(): void {
+  // `mutate()` returns a Promise (you can `await` it), but the reactive
+  // signals update regardless of whether you await.
+  this.creating.mutate({ name: 'John Doe', email: 'john@example.com' });
+}
+```
+
+Template:
+
+```html
+<button (click)="create()" [disabled]="creating.isLoading()">
+  {{ creating.isLoading() ? 'Creating…' : 'Create user' }}
+</button>
+
+@if (creating.error()) {
+  <p class="error">Failed to create user.</p>
+}
+
+@if (creating.result(); as user) {
+  <p>Created user: {{ user.name }} ({{ user.email }})</p>
+}
+```
+
+#### Endpoints with parameters
+
+For endpoints with path/query/header parameters, the parameters are bound at
+construction time (captured in the closure) and accept plain values or signals
+(like the `resource()` variants). Only the request body is passed to `mutate()`:
+
+```ts
+readonly userId = signal('usr_123');
+
+readonly uploading = this.usersApi.uploadUserAvatarMutation({
+  id: this.userId,  // signal — read when `mutate()` is invoked
+});
+
+upload(): void {
+  this.uploading.mutate({ file: this.file, caption: 'Profile photo' });
+}
+```
+
+#### Reset
+
+Call `reset()` to clear `result` and `error` and return the mutation to the
+`'idle'` status — useful when navigating away or re-opening a form:
+
+```ts
+ngOnDestroy(): void {
+  this.creating.reset();
+}
+```
+
+#### Enabling the feature
+
+Via config file:
+
+```ts
+export default defineConfig({
+  // ...
+  runtime: { signalMutations: true },
+});
+```
+
+Or via CLI:
+
+```bash
+ng-openapi-signals generate --signal-mutations
+```
+
+When enabled, the generator emits an additional `mutation-utils.ts` runtime
+file containing the `Mutation` interface and `createMutation` factory.
+
+#### `Mutation` interface
+
+```ts
+export type MutationStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export interface Mutation<TBody, TResult> {
+  readonly result: Signal<TResult | undefined>;
+  readonly error: Signal<unknown | undefined>;
+  readonly status: Signal<MutationStatus>;
+  readonly isLoading: Signal<boolean>;
+  mutate(body: TBody, signal?: AbortSignal): Promise<TResult>;
+  reset(): void;
+}
+```
+
 ---
 
 ## Runtime
@@ -65,6 +176,7 @@ The generated client includes a small runtime:
 api-fetch-client.ts   (or api-http-client.ts)
 api-error.ts
 signal-utils.ts
+mutation-utils.ts     (only when runtime.signalMutations is enabled)
 providers.ts
 ```
 
