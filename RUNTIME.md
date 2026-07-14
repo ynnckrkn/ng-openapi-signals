@@ -362,3 +362,114 @@ provideNgOpenapiSignals({
   errorMapper: async (res) => new MyApiError(await res.json()),
 });
 ```
+
+## Middleware with Dependency Injection
+
+Middleware functions are registered as plain function values via
+`provideNgOpenapiSignals({ middleware: [...] })`. Because they run
+asynchronously outside an Angular injection context, calling `inject()`
+inside a middleware closure throws `NG0203: inject() must be called from
+an injection context`.
+
+The recommended pattern for middleware that needs Angular dependencies is
+an `@Injectable()` service that exposes the middleware as an arrow-function
+property. The service is instantiated within an injection context, so
+`inject()` works in field initializers, and the arrow property keeps `this`
+bound when the function reference is passed into the middleware array.
+
+```ts
+// logging.middleware.ts
+import { Injectable } from '@angular/core';
+import { ApiRequestContext } from './generated/api';
+
+@Service()
+export class LoggingMiddleware {
+  // Dependencies injected in field initializers — works because the
+  // service is instantiated within an injection context.
+  // private readonly logger = inject(LoggerService);
+
+  // Arrow-function property: `this` stays bound when passed as a reference.
+  readonly __call = async (
+    req: ApiRequestContext,
+    next: () => Promise<Response>,
+  ): Promise<Response> => {
+    console.log('→', req.init.method, req.url);
+    const res = await next();
+    console.log('←', res.status);
+    return res;
+  };
+}
+```
+
+Register the service instance in `provideNgOpenapiSignals()`:
+
+```ts
+// app.config.ts
+import { ApplicationConfig, inject } from '@angular/core';
+import { provideNgOpenapiSignals } from './generated/api';
+import { LoggingMiddleware } from './logging.middleware';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideNgOpenapiSignals({
+      basePath: 'https://api.example.com',
+      middleware: [inject(LoggingMiddleware).__call],
+    }),
+  ],
+};
+```
+
+### Example: auth middleware with DI
+
+```ts
+// auth.middleware.ts
+import { Injectable, inject } from '@angular/core';
+import { ApiRequestContext } from './generated/api';
+
+@Service()
+export class AuthMiddleware {
+  private readonly authService = inject(AuthService);
+
+  readonly __call = async (
+    req: ApiRequestContext,
+    next: () => Promise<Response>,
+  ): Promise<Response> => {
+    const token = this.authService.token(); // signal-based token
+    req.init.headers = {
+      ...req.init.headers,
+      Authorization: `Bearer ${token}`,
+    };
+    return next();
+  };
+}
+```
+
+```ts
+// app.config.ts
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideNgOpenapiSignals({
+      basePath: 'https://api.example.com',
+      // Order matters: reduceRight means the first array element is the
+      // outermost layer (runs first on the request, last on the response).
+      middleware: [
+        inject(LoggingMiddleware).__call,
+        inject(AuthMiddleware).__call,
+      ],
+    }),
+  ],
+};
+```
+
+### Why a service instead of a plain closure?
+
+| Approach | DI works? | Testable? | Tree-shakable? |
+| --- | --- | --- | --- |
+| Plain closure in `middleware: [...]` | ❌ `NG0203` | manual | no |
+| `inject(Injector)` + `injector.get()` | ⚠️ manual | manual | no |
+| `@Injectable()` service + arrow property | ✅ full DI | ✅ `TestBed` | ✅ |
+
+> **Note:** This pattern applies to the `fetch` transport only. When using
+> `transport: 'httpClient'`, use Angular `HttpInterceptorFn` or class-based
+> `HttpInterceptor` instead — the middleware array is not emitted for the
+> `httpClient` transport.
