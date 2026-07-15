@@ -124,6 +124,7 @@ export async function generate(config: GeneratorConfig): Promise<void> {
 function generateIndexFile(config: GeneratorConfig): string {
   const transport = config.runtime?.transport ?? 'fetch';
   const signalMutations = config.runtime?.signalMutations === true;
+  const dateTransformer = config.runtime?.dateTransformer === true;
   const clientExport =
     transport === 'httpClient'
       ? "export * from './api-http-client';"
@@ -131,12 +132,15 @@ function generateIndexFile(config: GeneratorConfig): string {
   const mutationExport = signalMutations
     ? "export * from './mutation-utils';\n"
     : '';
+  const dateUtilsExport = dateTransformer
+    ? "export * from './date-utils';\n"
+    : '';
 
   return `export * from './providers';
 export * from './api-error';
 ${clientExport}
 export * from './signal-utils';
-${mutationExport}export * from './models';
+${mutationExport}${dateUtilsExport}export * from './models';
 export * from './resources';
 `;
 }

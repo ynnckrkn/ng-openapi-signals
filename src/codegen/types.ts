@@ -80,6 +80,15 @@ export interface RuntimeConfig {
    * zero-magic generation default.
    */
   signalMutations?: boolean;
+  /**
+   * When `true`, generates a `transformDates` runtime helper and wires it
+   * into the JSON response parsing path of both transports. ISO-8601
+   * date-time strings (e.g. `2026-07-15T12:00:00Z`) found anywhere in a
+   * parsed JSON body are recursively converted to `Date` instances.
+   * Non-JSON responses (text, blob, arrayBuffer, stream) are left
+   * untouched. Defaults to `false` to preserve the zero-magic default.
+   */
+  dateTransformer?: boolean;
 }
 
 export interface GeneratorConfig {

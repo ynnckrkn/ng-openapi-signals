@@ -2,12 +2,16 @@ import type {GeneratorConfig} from '../types';
 
 export function generateApiHttpClient(config: GeneratorConfig): string {
   const responseTypeHints = config.runtime?.responseTypeHints ?? true;
+  const dateTransformer = config.runtime?.dateTransformer === true;
   const responseTypeField = responseTypeHints
     ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';\n`
     : '';
+  const dateUtilsImport = dateTransformer
+    ? `import { transformDates } from './date-utils';\n`
+    : '';
 
   return `import { Service, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse, HttpResponse } from '@angular/common/http';
+${dateUtilsImport}import { HttpClient, HttpErrorResponse, HttpResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import {
   NG_OPENAPI_SIGNALS_BASE_PATH,
@@ -145,7 +149,7 @@ export class ApiHttpClient {
         return undefined as unknown as T;
       }
 
-      return response.body as T;
+      return ${dateTransformer ? `(options.responseType === 'json' ? transformDates(response.body) : response.body)` : 'response.body'} as T;
     } catch (error) {
       if (error instanceof HttpErrorResponse) {
         throw await this.errorMapper(error);

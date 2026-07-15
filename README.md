@@ -177,6 +177,7 @@ ng-openapi-signals generate --input <openapi-file> --output <output-directory>
 | `--default-query-explode <bool>` | Default query param explode (true/false)                      |
 | `--prefer-content-type <type>`   | Preferred request content type when multiple are offered       |
 | `--signal-mutations`             | Enable signal-based mutation methods (default: false)            |
+| `--date-transformer`            | Convert ISO-8601 date strings in JSON responses to Date objects (default: false) |
 | `--dry-run`                       | Print the files that would be generated without writing to disk |
 | `--check`                         | Verify generated output is up to date (exits 1 on mismatch; for CI) |
 | `--verbose`                       | Show detailed progress and file lists                         |
@@ -328,6 +329,27 @@ ng-openapi-signals generate --signal-mutations
 
 > See [`RUNTIME.md`](./RUNTIME.md) for full details on `MaybeSignal<T>`, the `Mutation` interface, response parsing, and more.
 
+### Date Transformer
+
+When `runtime.dateTransformer` is enabled (default `false`), the generator emits a `date-utils.ts` runtime file with a recursive `transformDates()` function that converts ISO-8601 date-time strings (e.g. `2026-07-15T12:00:00Z`) found anywhere in a parsed JSON response body into `Date` instances. Non-JSON responses (text, blob, arrayBuffer, stream) are left untouched.
+
+```ts
+// ng-openapi-signals.config.ts
+import {defineConfig} from 'ng-openapi-signals/config';
+
+export default defineConfig({
+  input: './openapi.json',
+  output: './src/generated/api',
+  runtime: { dateTransformer: true },
+});
+```
+
+```bash
+ng-openapi-signals generate --date-transformer
+```
+
+The transformer is applied automatically inside the generated client's JSON parsing path — no additional setup is needed at runtime. Works with both `fetch` and `httpClient` transports.
+
 ### Example snippets
 
 The repository includes standalone, commented example files in [`examples/usage/`](./examples/usage/):
@@ -339,6 +361,7 @@ The repository includes standalone, commented example files in [`examples/usage/
 - `auth-interceptor.ts` — auth headers and fetch middleware
 - `http-client-usage.ts` — `httpClient` transport setup
 - `multipart-upload.ts` — file upload with `FormData`
+- `date-transform-usage.ts` — automatic ISO-8601 date string → Date conversion (`runtime.dateTransformer`)
 
 These are illustrative only — adjust the import paths to your generated client directory. They are not included in the npm package.
 
@@ -353,6 +376,7 @@ api-fetch-client.ts   (or api-http-client.ts)
 api-error.ts
 signal-utils.ts
 mutation-utils.ts     (only when runtime.signalMutations is enabled)
+date-utils.ts        (only when runtime.dateTransformer is enabled)
 providers.ts
 ```
 
@@ -389,6 +413,7 @@ providers.ts
 | `defaultQueryExplode` | `boolean`               | `true`      | Default `explode` flag for query params when the spec doesn't specify it  |
 | `preferContentType` | `string`                  | `'application/json'` | Preferred content type when a request body offers multiple media types  |
 | `signalMutations`   | `boolean`                 | `false`     | Generate `${operationId}Mutation()` methods with reactive signals for POST/PUT/PATCH/DELETE |
+| `dateTransformer`  | `boolean`                 | `false`     | Convert ISO-8601 date-time strings in JSON responses to `Date` instances (emits `date-utils.ts`) |
 
 ### Using the `httpClient` transport
 

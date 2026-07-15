@@ -225,6 +225,24 @@ describe('config', () => {
       );
       expect(config.runtime!.signalMutations).toBe(false);
     });
+
+    it('defaults dateTransformer to false', () => {
+      const config = resolveConfig({}, {});
+      expect(config.runtime!.dateTransformer).toBe(false);
+    });
+
+    it('file dateTransformer=true overrides default false', () => {
+      const config = resolveConfig({}, {runtime: {dateTransformer: true}});
+      expect(config.runtime!.dateTransformer).toBe(true);
+    });
+
+    it('CLI dateTransformer overrides file', () => {
+      const config = resolveConfig(
+        {runtime: {dateTransformer: false}},
+        {runtime: {dateTransformer: true}},
+      );
+      expect(config.runtime!.dateTransformer).toBe(false);
+    });
   });
 
   describe('validateConfig', () => {
@@ -365,6 +383,17 @@ describe('config', () => {
           runtime: {signalMutations: 'yes' as unknown as boolean},
         }),
       ).toThrow('runtime.signalMutations must be a boolean');
+    });
+
+    it('throws when runtime.dateTransformer is not a boolean', () => {
+      expect(() =>
+        validateConfig({
+          ...DEFAULT_CONFIG,
+          input: './openapi.json',
+          output: './out',
+          runtime: {dateTransformer: 'yes' as unknown as boolean},
+        }),
+      ).toThrow('runtime.dateTransformer must be a boolean');
     });
 
     it('does not throw for valid new runtime config', () => {

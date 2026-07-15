@@ -29,5 +29,7 @@ export default defineConfig({
     // `result`/`error`/`status`/`isLoading` signals and `mutate()`/`reset()`.
     // Existing Promise-based methods remain (strictly additive).
     signalMutations: true,
+    // Convert ISO-8601 date strings in JSON responses to Date objects.
+    dateTransformer: true,
   },
 });

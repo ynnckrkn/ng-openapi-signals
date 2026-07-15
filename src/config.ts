@@ -19,6 +19,7 @@ export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   defaultQueryExplode: true,
   preferContentType: 'application/json',
   signalMutations: false,
+  dateTransformer: false,
 };
 
 export const DEFAULT_CONFIG: GeneratorConfig = {
@@ -105,6 +106,7 @@ function mergeRuntime(
     defaultQueryExplode: true,
     preferContentType: 'application/json',
     signalMutations: false,
+    dateTransformer: false,
   };
 
   for (const layer of layers) {
@@ -141,6 +143,10 @@ function mergeRuntime(
 
     if (layer.signalMutations !== undefined) {
       result.signalMutations = layer.signalMutations;
+    }
+
+    if (layer.dateTransformer !== undefined) {
+      result.dateTransformer = layer.dateTransformer;
     }
   }
 
@@ -243,6 +249,15 @@ export function validateConfig(config: GeneratorConfig): void {
   ) {
     throw new Error(
       'Configuration error: runtime.signalMutations must be a boolean.',
+    );
+  }
+
+  if (
+    runtime?.dateTransformer !== undefined &&
+    typeof runtime.dateTransformer !== 'boolean'
+  ) {
+    throw new Error(
+      'Configuration error: runtime.dateTransformer must be a boolean.',
     );
   }
 }

@@ -6,12 +6,17 @@ import {generateApiFetchClient} from './runtime/api-fetch-client';
 import {generateApiHttpClient} from './runtime/api-http-client';
 import {generateSignalUtils} from './runtime/signal-utils';
 import {generateMutationUtils} from './runtime/mutation-utils';
+import {generateDateUtils} from './runtime/date-utils';
 
 export function generateRuntimeFiles(config: GeneratorConfig): Record<string, string> {
   const transport = config.runtime?.transport ?? 'fetch';
   const signalMutations = config.runtime?.signalMutations === true;
+  const dateTransformer = config.runtime?.dateTransformer === true;
   const mutationUtilsFile = signalMutations
     ? {'mutation-utils.ts': generateMutationUtils()}
+    : {};
+  const dateUtilsFile = dateTransformer
+    ? {'date-utils.ts': generateDateUtils()}
     : {};
 
   if (transport === 'httpClient') {
@@ -21,6 +26,7 @@ export function generateRuntimeFiles(config: GeneratorConfig): Record<string, st
       'api-http-client.ts': generateApiHttpClient(config),
       'signal-utils.ts': generateSignalUtils(),
       ...mutationUtilsFile,
+      ...dateUtilsFile,
     };
   }
 
@@ -30,5 +36,6 @@ export function generateRuntimeFiles(config: GeneratorConfig): Record<string, st
     'api-fetch-client.ts': generateApiFetchClient(config),
     'signal-utils.ts': generateSignalUtils(),
     ...mutationUtilsFile,
+    ...dateUtilsFile,
   };
 }

@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- **Date Transformer (`runtime.dateTransformer`)**: Opt-in toggle (default `false`, CLI `--date-transformer`) that emits a `date-utils.ts` runtime file with a recursive `transformDates()` function converting ISO-8601 date-time strings in JSON response bodies to `Date` instances; wired into both `fetch` and `httpClient` transports' JSON parsing paths; added `tests/date-transform.test.ts`.
+
 - **Signal-based mutation layer (`runtime.signalMutations`)**: Opt-in toggle (default `false`, CLI `--signal-mutations`) generating `${operationId}Mutation()` methods for POST/PUT/PATCH/DELETE that return a `Mutation` with `result`/`error`/`status`/`isLoading` signals, `mutate(body)`, and `reset()`; emits `mutation-utils.ts` runtime file; added `examples/usage/mutation-signal-usage.ts` and `mutation-signal-params-usage.ts`.
 
 ### Changed

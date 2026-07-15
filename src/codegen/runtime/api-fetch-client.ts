@@ -2,12 +2,16 @@ import type {GeneratorConfig} from '../types';
 
 export function generateApiFetchClient(config: GeneratorConfig): string {
   const responseTypeHints = config.runtime?.responseTypeHints ?? true;
+  const dateTransformer = config.runtime?.dateTransformer === true;
   const responseTypeField = responseTypeHints
     ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';\n`
     : '';
+  const dateUtilsImport = dateTransformer
+    ? `import { transformDates } from './date-utils';\n`
+    : '';
 
   return `import { Service, inject } from '@angular/core';
-import {
+${dateUtilsImport}import {
   NG_OPENAPI_SIGNALS_BASE_PATH,
   NG_OPENAPI_SIGNALS_MIDDLEWARE,
   NG_OPENAPI_SIGNALS_AUTH,
@@ -237,7 +241,7 @@ export class ApiFetchClient {
     if (text.length === 0) {
       return undefined;
     }
-    return JSON.parse(text);
+    return ${dateTransformer ? 'transformDates(JSON.parse(text))' : 'JSON.parse(text)'};
   }
 
   private buildUrl(path: string, query?: Record<string, unknown | QueryParamOptions>): string {
