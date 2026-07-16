@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-16
+
 ### Fixed
 
 - **Robust JSON response parsing**: `parseJson` returns raw text instead of throwing `SyntaxError` when the actual `Content-Type` isn't JSON or `JSON.parse` fails.
