@@ -78,7 +78,7 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 ## 0.9.0 - Signal-based Mutation and Date Transformation
 
 - [x] Add signal based Mutation-Layer for POST/PUT/PATCH/DELETE (optional).
-- Add built-in transformers for dates.
+- [x] Add built-in transformers for dates.
 
 ## 0.10.x - Testing and Quality
 
