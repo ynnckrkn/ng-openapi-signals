@@ -7,14 +7,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **Robust JSON response parsing**: `parseJson` returns raw text instead of throwing `SyntaxError` when the actual `Content-Type` isn't JSON or `JSON.parse` fails.
+
 ### Added
 
 - **Date Transformer (`runtime.dateTransformer`)**: Opt-in toggle (default `false`, CLI `--date-transformer`) that emits a `date-utils.ts` runtime file with a recursive `transformDates()` function converting ISO-8601 date-time strings in JSON response bodies to `Date` instances; wired into both `fetch` and `httpClient` transports' JSON parsing paths; added `tests/date-transform.test.ts`.
-
 - **Signal-based mutation layer (`runtime.signalMutations`)**: Opt-in toggle (default `false`, CLI `--signal-mutations`) generating `${operationId}Mutation()` methods for POST/PUT/PATCH/DELETE that return a `Mutation` with `result`/`error`/`status`/`isLoading` signals, `mutate(body)`, and `reset()`; emits `mutation-utils.ts` runtime file; added `examples/usage/mutation-signal-usage.ts` and `mutation-signal-params-usage.ts`.
+- **`extractApiErrorMessage`**: Extracts a readable message from common error body shapes — NestJS `{message | message[]}`, FastAPI `{detail | detail[]}`, Express `{errors[]}`, RFC 7807 `{title, detail}`, generic `{error}`, strings, and `HTTP <status>: <statusText>` fallback.
+- Error JSON detection now matches any `*+json` content type (e.g. `application/problem+json`).
 
 ### Changed
 
+- **`ApiError` is now a real `Error` subclass**: Previously `toApiError` returned a plain object, causing Angular's `resource()` to wrap it with _"Resource returned an error that's not an Error instance: [object Object]"_. `ApiError` now extends `Error` with a readable `message` (via `extractApiErrorMessage`) while keeping `status`, `statusText`, `body`, and `headers` fields. Applies to `fetch` and `httpClient` transports.
 - `withRuntimeDefaults` preserves all runtime fields via spread; codegen conditionally emits mutation utilities — existing Promise-based methods remain (strictly additive).
 - **Stream responses use `ReadableStream` type**: `text/event-stream` (and other stream responses) now generate `request<ReadableStream>` instead of `request<string>`, matching the runtime value returned by `parseBody` (`response.body`).
 - **2xx responses without schema use `unknown` instead of `void`**: Non-204 success responses without a declared schema now produce `Promise<unknown>` / `resource<unknown>` so consumers can access the response body; `204 No Content` remains `void`.
@@ -65,7 +71,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 
 - `collectType` in `generate-models.ts` now unwraps a single surrounding pair of parentheses before recursing, so array-of-union types like `('A' | 'B' | 'C')[]` are correctly split for import collection.
-- `collectType` in `generate-api.ts` now unwraps a single surrounding pair of parentheses before recursing, so parenthesized array-of-union types in response/request/param types are correctly split for import collection. 
+- `collectType` in `generate-api.ts` now unwraps a single surrounding pair of parentheses before recursing, so parenthesized array-of-union types in response/request/param types are correctly split for import collection.
 - `extractResponseType` in `generate-api.ts` now inspects the `default` response as a fallback after the 2xx loop, preserving existing behavior for mixed endpoints (2xx types are preferred; `default` is only used when no 2xx schema is found).
 - `ApiFetchClient.parseBody` (fetch transport) now delegates JSON parsing to a new `parseJson` helper instead of calling `response.json()` directly.
 - `ApiFetchClient.request` (fetch transport) now passes `response.clone()` to `onResponse` instead of the original response.
@@ -132,7 +138,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **`onResponse` hook fired on error responses (fetch transport)**: The fetch transport `ApiFetchClient.request` invoked the `onResponse` hook before checking `response.ok`, causing the hook to fire on 4xx/5xx error responses. The documentation states the hook is "called after a successful response is received." The check order has been corrected: `!response.ok` is now evaluated first, and `onResponse` is only called for successful responses. The `httpClient` transport was already correct.
 - **Wasted `FormData` construction in `prepareBody` (fetch transport)**: The fetch transport `prepareBody` always built a `FormData` object from `options.formData` before checking whether the content type was `application/x-www-form-urlencoded`. When the content type was form-urlencoded, the `FormData` was discarded and replaced with `URLSearchParams`. The content-type check now happens first, matching the `httpClient` transport and avoiding the wasted allocation.
 - **Test fidelity gap for `stripUndefinedHeaders`**: The `api-fetch-client.test.ts` test helpers typed `headers` as `Record<string, string>` and spread values directly, while the generated runtime uses `Record<string, string | undefined>` with a `stripUndefinedHeaders` helper. The test helpers now mirror the runtime logic, ensuring optional header parameters that resolve to `undefined` are properly stripped.
-
 
 ## [0.6.2] - 2026-07-06
 

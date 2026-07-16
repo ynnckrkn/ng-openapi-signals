@@ -202,6 +202,11 @@ export class ApiFetchClient {
     if (responseType) {
       switch (responseType) {
         case 'json':
+          // Honor the actual response Content-Type when it contradicts the
+          // spec-declared responseType. A server may declare application/json
+          // in the OpenAPI document but actually return text/plain or
+          // text/html. In that case, return the raw text instead of forcing
+          // JSON parsing (which would throw a SyntaxError on non-JSON bodies).
           return this.parseJson(response);
         case 'text':
           return response.text();
@@ -232,16 +237,37 @@ export class ApiFetchClient {
   }
 
   /**
-   * Safely parses a JSON response body. An empty body (e.g. a 200 with
-   * Content-Type: application/json but no content) returns \`undefined\`
-   * instead of throwing a SyntaxError.
+   * Safely parses a JSON response body.
+   *
+   * - An empty body (e.g. a 200 with Content-Type: application/json but no
+   *   content) returns undefined instead of throwing a SyntaxError.
+   * - If the actual response Content-Type is not JSON (e.g. a server returns
+   *   text/plain or text/html despite the spec declaring application/json),
+   *   the raw text is returned without attempting JSON.parse.
+   * - As a last line of defense, if JSON.parse still fails (e.g. a JSON
+   *   Content-Type header with a non-JSON body), the raw text is returned
+   *   instead of throwing a SyntaxError.
    */
   private async parseJson(response: Response): Promise<unknown> {
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.length > 0 && !contentType.includes('json')) {
+      // The server returned a non-JSON content type (e.g. text/plain, text/html,
+      // image/png) despite the spec declaring application/json. Return the raw
+      // text instead of forcing JSON parsing (which would throw a SyntaxError).
+      const text = await response.text();
+      return text.length > 0 ? text : undefined;
+    }
     const text = await response.text();
     if (text.length === 0) {
       return undefined;
     }
-    return ${dateTransformer ? 'transformDates(JSON.parse(text))' : 'JSON.parse(text)'};
+    try {
+      return ${dateTransformer ? 'transformDates(JSON.parse(text))' : 'JSON.parse(text)'};
+    } catch {
+      // The body claims to be JSON but is not valid JSON. Return the raw text
+      // so callers receive something usable instead of a SyntaxError.
+      return text;
+    }
   }
 
   private buildUrl(path: string, query?: Record<string, unknown | QueryParamOptions>): string {

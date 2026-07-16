@@ -103,11 +103,25 @@ function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown 
 }
 
 async function parseJson(response: Response): Promise<unknown> {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.length > 0 && !contentType.includes('json')) {
+    // The server returned a non-JSON content type (e.g. text/plain, text/html,
+    // image/png) despite the spec declaring application/json. Return the raw
+    // text instead of forcing JSON parsing (which would throw a SyntaxError).
+    const text = await response.text();
+    return text.length > 0 ? text : undefined;
+  }
   const text = await response.text();
   if (text.length === 0) {
     return undefined;
   }
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    // The body claims to be JSON but is not valid JSON. Return the raw text
+    // so callers receive something usable instead of a SyntaxError.
+    return text;
+  }
 }
 
 async function parseBody(
@@ -984,6 +998,102 @@ describe('ApiFetchClient request logic', () => {
       const result = await client.request<{ok: boolean}>({method: 'GET', path: '/x'});
 
       expect(result).toEqual({ok: true});
+    });
+
+    it('returns raw text when responseType: json but server returns text/html', async () => {
+      const response = new Response('Hello World!', {
+        status: 200,
+        headers: {'content-type': 'text/html; charset=utf-8'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<string>({
+        method: 'GET',
+        path: '/',
+        responseType: 'json',
+      });
+
+      expect(result).toBe('Hello World!');
+    });
+
+    it('returns raw text when responseType: json but server returns text/plain', async () => {
+      const response = new Response('OK', {
+        status: 200,
+        headers: {'content-type': 'text/plain'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<string>({
+        method: 'GET',
+        path: '/health',
+        responseType: 'json',
+      });
+
+      expect(result).toBe('OK');
+    });
+
+    it('returns raw text when JSON.parse fails on application/json content-type', async () => {
+      const response = new Response('not json at all', {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<string>({
+        method: 'GET',
+        path: '/x',
+        responseType: 'json',
+      });
+
+      expect(result).toBe('not json at all');
+    });
+
+    it('returns undefined when content-type is json and body is empty', async () => {
+      const response = new Response('', {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<unknown>({
+        method: 'GET',
+        path: '/x',
+        responseType: 'json',
+      });
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns undefined when content-type is text/plain and body is empty', async () => {
+      const response = new Response('', {
+        status: 200,
+        headers: {'content-type': 'text/plain'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<unknown>({
+        method: 'GET',
+        path: '/x',
+        responseType: 'json',
+      });
+
+      expect(result).toBeUndefined();
+    });
+
+    it('still parses valid JSON with application/json content-type and responseType: json', async () => {
+      const response = new Response(JSON.stringify({id: 42}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const client = createClient({baseUrl, fetchFn: mockFetch(response)});
+
+      const result = await client.request<{id: number}>({
+        method: 'GET',
+        path: '/x',
+        responseType: 'json',
+      });
+
+      expect(result).toEqual({id: 42});
     });
   });
 

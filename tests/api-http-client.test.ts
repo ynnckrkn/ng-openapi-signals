@@ -89,11 +89,20 @@ type ApiErrorMapper = (
 type ApiRequestHook = (request: ApiRequestContext) => void | Promise<void>;
 type ApiResponseHook = (response: HttpResponseStub<unknown>) => void | Promise<void>;
 
-interface ApiError {
-  status: number;
-  statusText: string;
-  body: unknown;
-  headers: HttpHeadersStub;
+class ApiError extends Error {
+  readonly status: number;
+  readonly statusText: string;
+  readonly body: unknown;
+  readonly headers: HttpHeadersStub;
+
+  constructor(status: number, statusText: string, body: unknown, headers: HttpHeadersStub) {
+    super(`HTTP ${status}${statusText ? ': ' + statusText : ''}`);
+    this.name = 'ApiError';
+    this.status = status;
+    this.statusText = statusText;
+    this.body = body;
+    this.headers = headers;
+  }
 }
 
 interface ClientDeps {
@@ -183,12 +192,7 @@ function mapResponseType(
 }
 
 function toApiErrorFromHttpErrorResponse(error: HttpErrorResponseStub): ApiError {
-  return {
-    status: error.status,
-    statusText: '', // statusText from HttpErrorResponse is deprecated
-    body: error.error,
-    headers: error.headers,
-  };
+  return new ApiError(error.status, '', error.error, error.headers);
 }
 
 function prepareBody(options: ApiRequestOptions): {body: unknown; contentType: string | undefined} {
