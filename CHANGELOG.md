@@ -16,10 +16,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 
 - `withRuntimeDefaults` preserves all runtime fields via spread; codegen conditionally emits mutation utilities — existing Promise-based methods remain (strictly additive).
+- **Stream responses use `ReadableStream` type**: `text/event-stream` (and other stream responses) now generate `request<ReadableStream>` instead of `request<string>`, matching the runtime value returned by `parseBody` (`response.body`).
+- **2xx responses without schema use `unknown` instead of `void`**: Non-204 success responses without a declared schema now produce `Promise<unknown>` / `resource<unknown>` so consumers can access the response body; `204 No Content` remains `void`.
+- **Named schemas with `additionalProperties` generate `Record<string, T>` type aliases**: A `components.schemas` entry with `type: object` and `additionalProperties` (no `properties`) now produces `export type X = Record<string, T>` instead of an empty `interface X {}`, matching the inline-schema behavior and avoiding global `Object` shadowing.
 
 ### Tests
 
 - `tests/config.test.ts` and `tests/generated-api.test.ts` cover `signalMutations` default, overrides, validation, generated mutation methods, and absence by default.
+- `tests/stream-download.test.ts` updated to assert `request<ReadableStream>` for event-stream responses.
+- Added `tests/fixtures/response-no-schema.yml` + `tests/response-no-schema.test.ts` covering 200-without-schema (`unknown`) and 204 (`void`) return types.
+- Added `tests/fixtures/named-records.yml` + `tests/named-records.test.ts` covering named schemas with `additionalProperties` (`Record<string, User>` / `Record<string, unknown>` type aliases).
 
 ## [0.8.0] - 2026-07-12
 

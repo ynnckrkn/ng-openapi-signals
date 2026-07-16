@@ -42,6 +42,23 @@ function extractSchemaModel(name: string, schema: any): SchemaModel {
     };
   }
 
+  // Object schema with only `additionalProperties` (no `properties`) → type alias
+  // `Record<string, T>`. Without this the generator would emit an empty interface
+  // (e.g. `export interface RecordResponse {}`), silently dropping the value
+  // type and, for a schema named `Object`, shadowing the global `Object` type.
+  if (
+    schema.type === 'object' &&
+    !schema.properties &&
+    schema.additionalProperties !== undefined
+  ) {
+    return {
+      name,
+      kind: 'alias',
+      properties: [],
+      aliasType: schemaToTsType(schema),
+    };
+  }
+
   // Object schema → interface
   const required = new Set<string>(schema.required ?? []);
   const properties = schema.properties ?? {};

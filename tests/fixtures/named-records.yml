@@ -1,0 +1,46 @@
+openapi: 3.0.3
+info:
+  title: Named Record Fixture
+  version: 1.0.0
+paths:
+  /users-map:
+    get:
+      operationId: getUsersMap
+      tags: [Map]
+      responses:
+        "200":
+          description: A map of users keyed by id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsersMap"
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [Map]
+      responses:
+        "200":
+          description: Open settings map.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsMap"
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    UsersMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/User"
+    SettingsMap:
+      type: object
+      additionalProperties: true

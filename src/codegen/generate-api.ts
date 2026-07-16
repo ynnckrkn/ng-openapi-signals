@@ -468,6 +468,10 @@ function extractResponseType(operation: any): {
 
   // Collect all 2xx response schemas (including 2XX range from OpenAPI 3.1).
   const successSchemas: string[] = [];
+  // Tracks whether a non-204 2xx response was found that has no schema. Such
+  // responses may still carry a body at runtime, so the type should be `unknown`
+  // rather than `void` (which would discard the body on the type level).
+  let found2xxWithoutSchema = false;
   let responseParser: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream' | undefined;
 
   for (const [statusCode, response] of Object.entries(responses)) {
@@ -477,8 +481,19 @@ function extractResponseType(operation: any): {
 
     const {schema, contentType} = extractSchemaFromResponse(response);
 
-    // 204 / no content → void; skip adding to the union.
+    // 204 No Content → void; skip adding to the union.
+    if (statusCode === '204') {
+      continue;
+    }
+
+    // Other 2xx without a schema → remember for `unknown` fallback below.
     if (!schema || schema === 'void') {
+      found2xxWithoutSchema = true;
+
+      // Use the first success response's content type to derive the parser hint.
+      if (!responseParser && contentType) {
+        responseParser = parserForContentType(contentType);
+      }
       continue;
     }
 
@@ -507,13 +522,26 @@ function extractResponseType(operation: any): {
   }
 
   if (successSchemas.length === 0) {
+    // A non-204 2xx response without a schema may still return a body at
+    // runtime (e.g. NestJS `@ApiOkResponse()` without a schema). Use `unknown`
+    // so consumers can access the body, instead of `void` which discards it.
+    if (found2xxWithoutSchema) {
+      return {responseType: 'unknown'};
+    }
     return {responseType: 'void'};
   }
 
   // Deduplicate while preserving order.
   const unique = Array.from(new Set(successSchemas));
 
-  const responseType = unique.length === 1 ? unique[0]! : unique.join(' | ');
+  let responseType = unique.length === 1 ? unique[0]! : unique.join(' | ');
+
+  // Stream responses (e.g. text/event-stream) return a ReadableStream at
+  // runtime, regardless of the declared schema type. Override the schema-
+  // derived type so the generated client reflects the actual runtime value.
+  if (responseParser === 'stream') {
+    responseType = 'ReadableStream';
+  }
 
   return {
     responseType,

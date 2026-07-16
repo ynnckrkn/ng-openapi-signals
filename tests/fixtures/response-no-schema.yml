@@ -1,0 +1,28 @@
+openapi: 3.0.3
+info:
+  title: Response No Schema Fixture
+  version: 1.0.0
+paths:
+  /echo:
+    post:
+      operationId: echoBody
+      tags: [Echo]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+      responses:
+        "200":
+          description: Echoed body (no schema declared).
+  /no-content:
+    delete:
+      operationId: deleteNoSchema
+      tags: [Echo]
+      responses:
+        "204":
+          description: Deleted.
