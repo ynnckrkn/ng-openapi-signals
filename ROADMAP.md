@@ -80,7 +80,12 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Add signal based Mutation-Layer for POST/PUT/PATCH/DELETE (optional).
 - [x] Add built-in transformers for dates.
 
-## 0.10.x - Testing and Quality
+## 0.10.x - Generated Resources & Services
+
+- Rename folder `resource` to `services`
+- Ensure that the generated function `getXResource(params)` allows `params()` to return `undefined` (preserve Angular `resource()` idle-state) to prevent immediate HTTP requests and 401s.
+
+## 0.11.x - Testing and Quality
 
 - Add fixture-based generator tests.
 - Add snapshot tests for generated output.
