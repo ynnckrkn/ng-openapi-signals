@@ -33,11 +33,11 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm test -- --run
-
       - name: Generate example
         run: npm run generate:example
+
+      - name: Test
+        run: npm test -- --run
 
       - name: Check generated output is up to date
         run: git diff --exit-code examples/generated
