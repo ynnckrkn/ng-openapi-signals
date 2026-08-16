@@ -35,6 +35,8 @@ interface OpenApiOperation {
 /** A parameter (path/query/header/cookie). */
 interface OpenApiParameter {
   name: string;
+  in: 'path' | 'query' | 'header' | 'cookie';
+  required?: boolean;
   schema?: OpenAPISchema;
 }
 

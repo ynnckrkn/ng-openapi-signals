@@ -41,10 +41,15 @@ export async function generateFiles(config: GeneratorConfig): Promise<Record<str
   const api = await loadOpenApi(normalizedConfig.input);
 
   // Hoist anonymous inline schemas into components.schemas before extraction.
-  hoistInlineSchemas(api);
+  // We treat `api` as our permissive document shape — `openapi-types` exposes
+  // richer, stricter types (e.g. `ReferenceObject` parameters) that we don't
+  // walk here, and `exactOptionalPropertyTypes` forbids assigning them across.
+  const doc = api as unknown as Parameters<typeof hoistInlineSchemas>[0];
 
-  const schemas = extractSchemas(api);
-  const operations = extractOperations(api);
+  hoistInlineSchemas(doc);
+
+  const schemas = extractSchemas(doc);
+  const operations = extractOperations(doc);
 
   return {
     ...generateRuntimeFiles(normalizedConfig),
