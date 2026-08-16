@@ -6,9 +6,7 @@ export function generateApiFetchClient(config: GeneratorConfig): string {
   const responseTypeField = responseTypeHints
     ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';\n`
     : '';
-  const dateUtilsImport = dateTransformer
-    ? `import { transformDates } from './date-utils';\n`
-    : '';
+  const dateUtilsImport = dateTransformer ? `import { transformDates } from './date-utils';\n` : '';
 
   return `import { Service, inject } from '@angular/core';
 ${dateUtilsImport}import {
@@ -53,13 +51,13 @@ export interface ApiRequestOptions {
    * Content-Type is set automatically by the browser (multipart boundary).
    */
   contentType?: string;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
 ${responseTypeField}}
 
 @Service()
 export class ApiFetchClient {
   private readonly baseUrl = inject(NG_OPENAPI_SIGNALS_BASE_PATH);
-  private readonly middleware = inject(NG_OPENAPI_SIGNALS_MIDDLEWARE);
+  private readonly middleware = inject(NG_OPENAPI_SIGNALS_MIDDLEWARE, { optional: true }) ?? [];
   private readonly auth = inject(NG_OPENAPI_SIGNALS_AUTH, { optional: true });
   private readonly defaultHeaders = inject(NG_OPENAPI_SIGNALS_DEFAULT_HEADERS);
   private readonly errorMapper = inject(NG_OPENAPI_SIGNALS_ERROR_MAPPER);
@@ -84,7 +82,7 @@ export class ApiFetchClient {
 
     const init: RequestInit = {
       method: options.method,
-      signal: options.signal,
+      signal: options.signal ?? null,
       headers,
       ...(body !== undefined ? { body } : {})
     };
@@ -98,7 +96,11 @@ export class ApiFetchClient {
     const coreFetch = async (): Promise<Response> => fetch(context.url, context.init);
 
     const pipeline = this.middleware.reduceRight<() => Promise<Response>>(
-      (next, mw) => async () => mw(context, next),
+      (next, mw) =>
+        async () =>
+          typeof mw === 'function'
+            ? mw(context, next)
+            : mw.handle(context, next),
       coreFetch,
     );
 

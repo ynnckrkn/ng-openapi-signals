@@ -100,6 +100,32 @@ describe('generate', () => {
     expect(providersContent).toContain('EnvironmentProviders');
   });
 
+  it('generates class-based middleware DI support in providers', async () => {
+    await generate({
+      input: 'examples/openapi.json',
+      output: OUTPUT_DIR,
+      clean: true,
+      groupBy: 'tag',
+    });
+
+    const providersContent = await readFile(join(OUTPUT_DIR, 'providers.ts'), 'utf8');
+    // Multi-provider InjectionToken for middleware.
+    expect(providersContent).toContain('NG_OPENAPI_SIGNALS_MIDDLEWARE');
+    expect(providersContent).toContain('multi: true');
+    // ApiMiddleware interface (class-based) alongside ApiMiddlewareFn (function).
+    expect(providersContent).toContain('export interface ApiMiddleware');
+    expect(providersContent).toContain('export type ApiMiddlewareFn');
+    expect(providersContent).toContain('ApiMiddlewareEntry');
+    // Token has a factory fallback so optional injection does not crash.
+    expect(providersContent).toContain('factory: () => []');
+
+    const clientContent = await readFile(join(OUTPUT_DIR, 'api-fetch-client.ts'), 'utf8');
+    // Duck-typing dispatch: typeof mw === 'function' ? mw(...) : mw.handle(...).
+    expect(clientContent).toContain("typeof mw === 'function'");
+    expect(clientContent).toContain('mw.handle(context, next)');
+    expect(clientContent).toContain('NG_OPENAPI_SIGNALS_MIDDLEWARE');
+  });
+
   it('groups by path when groupBy is path', async () => {
     await generate({
       input: 'examples/openapi.json',

@@ -12,7 +12,7 @@
  */
 
 import {Component, computed, inject} from '@angular/core';
-import {UsersApi} from './generated/resources/users.api';
+import {UsersApi} from '../../examples/generated/resources/users.api';
 
 @Component({
   selector: 'app-user-profile',

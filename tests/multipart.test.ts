@@ -54,8 +54,6 @@ describe('multipart form data generation', () => {
     const methodMatch = content.match(/createBulkUsers[\s\S]*?\n {2}}/);
     expect(methodMatch).not.toBeNull();
     expect(methodMatch![0]).toContain('formData: body');
-    expect(methodMatch![0]).toContain(
-      "contentType: 'application/x-www-form-urlencoded'",
-    );
+    expect(methodMatch![0]).toContain("contentType: 'application/x-www-form-urlencoded'");
   });
 });

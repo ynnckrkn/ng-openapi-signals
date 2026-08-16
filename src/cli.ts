@@ -22,11 +22,23 @@ program
   .option('--no-clean', 'Preserve existing files in output directory')
   .option('--group-by <mode>', 'Group APIs by tag or path (default: tag)')
   .option('--transport <type>', 'HTTP transport: fetch or httpClient (default: fetch)')
-  .option('--default-query-style <style>', 'Default query param style: form, spaceDelimited, pipeDelimited, or deepObject')
+  .option(
+    '--default-query-style <style>',
+    'Default query param style: form, spaceDelimited, pipeDelimited, or deepObject',
+  )
   .option('--default-query-explode <bool>', 'Default query param explode (true/false)')
-  .option('--prefer-content-type <type>', 'Preferred request content type when multiple are offered')
-  .option('--signal-mutations', 'Generate signal-based …Mutation() methods for POST/PUT/PATCH/DELETE (default: false)')
-  .option('--date-transformer', 'Convert ISO-8601 date strings in JSON responses to Date objects (default: false)')
+  .option(
+    '--prefer-content-type <type>',
+    'Preferred request content type when multiple are offered',
+  )
+  .option(
+    '--signal-mutations',
+    'Generate signal-based …Mutation() methods for POST/PUT/PATCH/DELETE (default: false)',
+  )
+  .option(
+    '--date-transformer',
+    'Convert ISO-8601 date strings in JSON responses to Date objects (default: false)',
+  )
   .option('--dry-run', 'Print the files that would be generated without writing to disk')
   .option('--check', 'Verify generated output is up to date (exits 1 on mismatch; for CI)')
   .option('--verbose', 'Show detailed progress and file lists')
@@ -55,12 +67,8 @@ program
         ...(options.preferContentType !== undefined
           ? {runtime: {preferContentType: options.preferContentType}}
           : {}),
-        ...(options.signalMutations === true
-          ? {runtime: {signalMutations: true}}
-          : {}),
-        ...(options.dateTransformer === true
-          ? {runtime: {dateTransformer: true}}
-          : {}),
+        ...(options.signalMutations === true ? {runtime: {signalMutations: true}} : {}),
+        ...(options.dateTransformer === true ? {runtime: {dateTransformer: true}} : {}),
       };
 
       const config = resolveConfig(cliConfig, fileConfig);
@@ -123,9 +131,7 @@ program
           }
         }
 
-        logger.success(
-          `Dry run: ${fileCount} file(s) would be written to ${config.output}.`,
-        );
+        logger.success(`Dry run: ${fileCount} file(s) would be written to ${config.output}.`);
 
         return;
       }

@@ -8,7 +8,7 @@ paths:
       operationId: getEvents
       tags: [Stream]
       responses:
-        "200":
+        '200':
           description: Server-Sent Events stream.
           content:
             text/event-stream:
@@ -19,7 +19,7 @@ paths:
       operationId: downloadFile
       tags: [Stream]
       responses:
-        "200":
+        '200':
           description: Binary file download.
           content:
             application/octet-stream:

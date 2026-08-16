@@ -21,9 +21,7 @@ describe('error messages', () => {
 
   describe('loadOpenApi', () => {
     it('reports a clear message when the input file is missing', async () => {
-      await expect(loadOpenApi(MISSING_INPUT)).rejects.toThrow(
-        /OpenAPI input file not found/,
-      );
+      await expect(loadOpenApi(MISSING_INPUT)).rejects.toThrow(/OpenAPI input file not found/);
       await expect(loadOpenApi(MISSING_INPUT)).rejects.toThrow(MISSING_INPUT);
     });
 

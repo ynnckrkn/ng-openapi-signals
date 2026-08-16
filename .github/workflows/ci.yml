@@ -41,3 +41,31 @@ jobs:
 
       - name: Check generated output is up to date
         run: git diff --exit-code examples/generated
+
+  release-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publint
+        run: npm run check:publint
+
+      - name: Are the types wrong
+        run: npm run check:attw
+
+      - name: Knip
+        run: npm run check:knip

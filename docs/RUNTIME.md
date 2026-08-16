@@ -65,14 +65,14 @@ The feature is strictly additive — the Promise-based methods remain unchanged.
 The mutation method returns a `Mutation<TBody, TResult>` object exposing
 reactive signals:
 
-| Member     | Type                              | Description                                              |
-| ---------- | --------------------------------- | -------------------------------------------------------- |
-| `result`   | `Signal<TResult \| undefined>`    | Last successful response value (or `undefined`)          |
-| `error`    | `Signal<unknown \| undefined>`    | Last thrown error (or `undefined`)                       |
-| `status`   | `Signal<MutationStatus>`          | `'idle' \| 'loading' \| 'success' \| 'error'`            |
-| `isLoading`| `Signal<boolean>`                 | `computed(() => status() === 'loading')`                |
-| `mutate`   | `(body, signal?) => Promise<TResult>` | Triggers the request, updates signals, resolves to the result |
-| `reset`    | `() => void`                      | Clears `result`/`error` and returns `status` to `'idle'` |
+| Member      | Type                                  | Description                                                   |
+| ----------- | ------------------------------------- | ------------------------------------------------------------- |
+| `result`    | `Signal<TResult \| undefined>`        | Last successful response value (or `undefined`)               |
+| `error`     | `Signal<unknown \| undefined>`        | Last thrown error (or `undefined`)                            |
+| `status`    | `Signal<MutationStatus>`              | `'idle' \| 'loading' \| 'success' \| 'error'`                 |
+| `isLoading` | `Signal<boolean>`                     | `computed(() => status() === 'loading')`                      |
+| `mutate`    | `(body, signal?) => Promise<TResult>` | Triggers the request, updates signals, resolves to the result |
+| `reset`     | `() => void`                          | Clears `result`/`error` and returns `status` to `'idle'`      |
 
 #### Basic usage
 
@@ -94,11 +94,9 @@ Template:
 </button>
 
 @if (creating.error()) {
-  <p class="error">Failed to create user.</p>
-}
-
-@if (creating.result(); as user) {
-  <p>Created user: {{ user.name }} ({{ user.email }})</p>
+<p class="error">Failed to create user.</p>
+} @if (creating.result(); as user) {
+<p>Created user: {{ user.name }} ({{ user.email }})</p>
 }
 ```
 
@@ -138,7 +136,7 @@ Via config file:
 ```ts
 export default defineConfig({
   // ...
-  runtime: { signalMutations: true },
+  runtime: {signalMutations: true},
 });
 ```
 
@@ -265,12 +263,12 @@ api.getUserByIdResource({
 Generated methods emit a `responseType` hint derived from the OpenAPI response
 `content` type, so the runtime picks the right parser:
 
-| OpenAPI content type                                           | `responseType` | TypeScript return type |
-| -------------------------------------------------------------- | -------------- | ---------------------- |
-| `application/json` (and `*+json`)                              | `'json'`       | inferred from schema   |
-| `text/*`                                                       | `'text'`       | `string`               |
+| OpenAPI content type                                           | `responseType` | TypeScript return type                                 |
+| -------------------------------------------------------------- | -------------- | ------------------------------------------------------ |
+| `application/json` (and `*+json`)                              | `'json'`       | inferred from schema                                   |
+| `text/*`                                                       | `'text'`       | `string`                                               |
 | `text/event-stream`                                            | `'stream'`     | `string` (fetch: `ReadableStream`, httpClient: `Blob`) |
-| `image/*`, `audio/*`, `video/*`, `octet-stream`, `multipart/*` | `'blob'`       | `Blob`                 |
+| `image/*`, `audio/*`, `video/*`, `octet-stream`, `multipart/*` | `'blob'`       | `Blob`                                                 |
 
 For responses without a known content type the runtime falls back to
 content-type sniffing. Set `runtime.responseTypeHints: false` in the config
@@ -306,17 +304,17 @@ transformed.
 
 The generated methods call `this.client.request<T>(options)` with these fields:
 
-| Field         | Type                                              | Description                                                              |
-| ------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
-| `method`      | `string`                                          | HTTP method (`'GET'`, `'POST'`, ...)                                     |
-| `path`        | `string`                                          | URL path (with path params interpolated)                                |
-| `query`       | `Record<string, unknown \| QueryParamOptions>`    | Query params (plain values or wrapped with style/explode metadata)     |
-| `headers`     | `Record<string, string>`                       | Per-request headers (merged over defaults)                               |
-| `body`        | `unknown`                                         | Request body (JSON-serialized unless `FormData`/`Blob`/`ArrayBuffer`)    |
-| `formData`    | `Record<string, unknown>`                       | Form data object (built into `FormData` or `URLSearchParams` by runtime) |
-| `contentType` | `string`                                          | Explicit Content-Type (defaults to `application/json` for JSON bodies)  |
-| `signal`     | `AbortSignal`                                     | Abort signal for cancellation                                            |
-| `responseType`| `'json' \| 'text' \| 'blob' \| 'arrayBuffer' \| 'stream'` | Response parser hint                                                     |
+| Field          | Type                                                      | Description                                                              |
+| -------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `method`       | `string`                                                  | HTTP method (`'GET'`, `'POST'`, ...)                                     |
+| `path`         | `string`                                                  | URL path (with path params interpolated)                                 |
+| `query`        | `Record<string, unknown \| QueryParamOptions>`            | Query params (plain values or wrapped with style/explode metadata)       |
+| `headers`      | `Record<string, string>`                                  | Per-request headers (merged over defaults)                               |
+| `body`         | `unknown`                                                 | Request body (JSON-serialized unless `FormData`/`Blob`/`ArrayBuffer`)    |
+| `formData`     | `Record<string, unknown>`                                 | Form data object (built into `FormData` or `URLSearchParams` by runtime) |
+| `contentType`  | `string`                                                  | Explicit Content-Type (defaults to `application/json` for JSON bodies)   |
+| `signal`       | `AbortSignal`                                             | Abort signal for cancellation                                            |
+| `responseType` | `'json' \| 'text' \| 'blob' \| 'arrayBuffer' \| 'stream'` | Response parser hint                                                     |
 
 ### Query Parameter Serialization
 
@@ -332,12 +330,12 @@ query: {
 
 The runtime `buildUrl` method serializes according to the style:
 
-| Style             | `explode: true`           | `explode: false`           |
-| ----------------- | -------------------------- | -------------------------- |
-| `form`            | `key=val1&key=val2`        | `key=val1,val2`             |
-| `spaceDelimited`  | `key=val1&key=val2`        | `key=val1%20val2`           |
-| `pipeDelimited`   | `key=val1&key=val2`        | `key=val1\|val2`            |
-| `deepObject`      | `key[prop]=val`            | —                          |
+| Style            | `explode: true`     | `explode: false`  |
+| ---------------- | ------------------- | ----------------- |
+| `form`           | `key=val1&key=val2` | `key=val1,val2`   |
+| `spaceDelimited` | `key=val1&key=val2` | `key=val1%20val2` |
+| `pipeDelimited`  | `key=val1&key=val2` | `key=val1\|val2`  |
+| `deepObject`     | `key[prop]=val`     | —                 |
 
 ### Multipart Form Data
 
@@ -390,113 +388,121 @@ provideNgOpenapiSignals({
 });
 ```
 
-## Middleware with Dependency Injection
+## Middleware
 
-Middleware functions are registered as plain function values via
-`provideNgOpenapiSignals({ middleware: [...] })`. Because they run
-asynchronously outside an Angular injection context, calling `inject()`
-inside a middleware closure throws `NG0203: inject() must be called from
-an injection context`.
+Middleware lets you intercept every request/response cycle in onion-style
+order: each middleware receives the request context and a `next` function
+that calls the next middleware (or the core `fetch()`). Middleware can
+mutate the request, short-circuit, transform the response, or handle errors.
 
-The recommended pattern for middleware that needs Angular dependencies is
-an `@Injectable()` service that exposes the middleware as an arrow-function
-property. The service is instantiated within an injection context, so
-`inject()` works in field initializers, and the arrow property keeps `this`
-bound when the function reference is passed into the middleware array.
+There are two kinds of middleware, both registered on the same
+`NG_OPENAPI_SIGNALS_MIDDLEWARE` multi-provider token:
 
-```ts
-// logging.middleware.ts
-import { Injectable } from '@angular/core';
-import { ApiRequestContext } from './generated/api';
+| Kind               | Shape                                               | DI?                     | When to use                                    |
+| ------------------ | --------------------------------------------------- | ----------------------- | ---------------------------------------------- |
+| **Function-based** | `(req, next) => Promise<Response>`                  | ❌ no injection context | Simple, stateless logic (logging, tracing)     |
+| **Class-based**    | `implements ApiMiddleware` with `handle(req, next)` | ✅ constructor DI       | Auth, feature flags, anything needing services |
 
-@Service()
-export class LoggingMiddleware {
-  // Dependencies injected in field initializers — works because the
-  // service is instantiated within an injection context.
-  // private readonly logger = inject(LoggerService);
+The runtime dispatches via `typeof mw === 'function'`: functions are called
+directly as `ApiMiddlewareFn`, objects have their `handle()` method invoked
+as class instances.
 
-  // Arrow-function property: `this` stays bound when passed as a reference.
-  readonly __call = async (
-    req: ApiRequestContext,
-    next: () => Promise<Response>,
-  ): Promise<Response> => {
-    console.log('→', req.init.method, req.url);
-    const res = await next();
-    console.log('←', res.status);
-    return res;
-  };
-}
-```
+### Function-based middleware (convenience)
 
-Register the service instance in `provideNgOpenapiSignals()`:
+Register plain functions via the `middleware` array in
+`provideNgOpenapiSignals()`. The array is flattened into multi-providers,
+preserving order:
 
 ```ts
-// app.config.ts
-import { ApplicationConfig, inject } from '@angular/core';
-import { provideNgOpenapiSignals } from './generated/api';
-import { LoggingMiddleware } from './logging.middleware';
-
-export const appConfig: ApplicationConfig = {
-  providers: [
-    provideNgOpenapiSignals({
-      basePath: 'https://api.example.com',
-      middleware: [inject(LoggingMiddleware).__call],
-    }),
+provideNgOpenapiSignals({
+  basePath: 'https://api.example.com',
+  middleware: [
+    async (req, next) => {
+      console.log('→', req.init.method, req.url);
+      const res = await next();
+      console.log('←', res.status);
+      return res;
+    },
   ],
-};
+});
 ```
 
-### Example: auth middleware with DI
+### Class-based middleware (with DI)
+
+For middleware that needs Angular services, implement the `ApiMiddleware`
+interface and register it as a multi-provider. Angular instantiates the
+class via DI, so you can inject services through the constructor:
 
 ```ts
 // auth.middleware.ts
-import { Injectable, inject } from '@angular/core';
-import { ApiRequestContext } from './generated/api';
+import {Injectable} from '@angular/core';
+import {ApiMiddleware, ApiRequestContext} from './generated/api';
 
-@Service()
-export class AuthMiddleware {
-  private readonly authService = inject(AuthService);
+@Injectable()
+export class AuthMiddleware implements ApiMiddleware {
+  constructor(private auth: AuthService) {}
 
-  readonly __call = async (
-    req: ApiRequestContext,
-    next: () => Promise<Response>,
-  ): Promise<Response> => {
-    const token = this.authService.token(); // signal-based token
+  async handle(req: ApiRequestContext, next: () => Promise<Response>): Promise<Response> {
+    const token = this.auth.token(); // signal-based token
     req.init.headers = {
       ...req.init.headers,
       Authorization: `Bearer ${token}`,
     };
     return next();
-  };
+  }
 }
 ```
 
+Register via `{ provide, multi: true, useClass }` — no need to instantiate
+manually:
+
 ```ts
 // app.config.ts
+import {ApplicationConfig} from '@angular/core';
+import {provideNgOpenapiSignals, NG_OPENAPI_SIGNALS_MIDDLEWARE} from './generated/api';
+import {AuthMiddleware} from './auth.middleware';
+
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideNgOpenapiSignals({
-      basePath: 'https://api.example.com',
-      // Order matters: reduceRight means the first array element is the
-      // outermost layer (runs first on the request, last on the response).
-      middleware: [
-        inject(LoggingMiddleware).__call,
-        inject(AuthMiddleware).__call,
-      ],
-    }),
+    provideNgOpenapiSignals({basePath: 'https://api.example.com'}),
+    {provide: NG_OPENAPI_SIGNALS_MIDDLEWARE, multi: true, useClass: AuthMiddleware},
   ],
 };
 ```
 
-### Why a service instead of a plain closure?
+### Coexistence of both patterns
 
-| Approach | DI works? | Testable? | Tree-shakable? |
-| --- | --- | --- | --- |
-| Plain closure in `middleware: [...]` | ❌ `NG0203` | manual | no |
-| `inject(Injector)` + `injector.get()` | ⚠️ manual | manual | no |
-| `@Injectable()` service + arrow property | ✅ full DI | ✅ `TestBed` | ✅ |
+Function-based and class-based middleware share the same token and run in
+the same pipeline. Angular merges `multi: true` providers in registration
+order; `reduceRight` means the first registered entry is the outermost
+layer (runs first on the request, last on the response):
 
-> **Note:** This pattern applies to the `fetch` transport only. When using
-> `transport: 'httpClient'`, use Angular `HttpInterceptorFn` or class-based
-> `HttpInterceptor` instead — the middleware array is not emitted for the
-> `httpClient` transport.
+```ts
+provideNgOpenapiSignals({
+  basePath: 'https://api.example.com',
+  // Function-based convenience entries.
+  middleware: [loggingFn],
+}),
+// Class-based entry from a feature module.
+{provide: NG_OPENAPI_SIGNALS_MIDDLEWARE, multi: true, useClass: AuthMiddleware},
+```
+
+### Registering from feature modules
+
+Because `NG_OPENAPI_SIGNALS_MIDDLEWARE` is a multi-provider, any feature
+module can add middleware without touching the root config:
+
+```ts
+// logging.feature.ts
+import {EnvironmentProviders, makeEnvironmentProviders} from '@angular/core';
+import {NG_OPENAPI_SIGNALS_MIDDLEWARE} from './generated/api';
+import {LoggingMiddleware} from './logging.middleware';
+
+export function provideLogging(): EnvironmentProviders {
+  return makeEnvironmentProviders([
+    {provide: NG_OPENAPI_SIGNALS_MIDDLEWARE, multi: true, useClass: LoggingMiddleware},
+  ]);
+}
+```
+
+> **Note:** Middleware applies to the `fetch` transport only. When using `transport: 'httpClient'`, use Angular `HttpInterceptor`

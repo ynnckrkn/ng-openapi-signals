@@ -33,7 +33,7 @@ describe('header parameter generation', () => {
 
   it('generates headers object in the request', async () => {
     const content = await readApiFile();
-    expect(content).toContain("headers: {");
+    expect(content).toContain('headers: {');
     expect(content).toContain("'X-Request-Id': params['X-Request-Id']");
   });
 
@@ -61,9 +61,7 @@ describe('header parameter generation', () => {
     // Mutation methods receive MaybeSignal<T> and must unwrap signals before
     // assigning to the headers object, otherwise TS2322 is raised:
     //   Type 'MaybeSignal<string>' is not assignable to type 'string | undefined'.
-    expect(content).toContain(
-      "'X-Request-Id': readSignalOrValue(params['X-Request-Id'])",
-    );
+    expect(content).toContain("'X-Request-Id': readSignalOrValue(params['X-Request-Id'])");
   });
 
   it('does not double-unwrap header params in GET resource methods', async () => {

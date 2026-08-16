@@ -23,6 +23,7 @@ GET endpoints are generated as Angular `resource()` APIs, while mutating endpoin
 - JSON, text, `Blob`, `ArrayBuffer` and `ReadableStream` response handling
 - File download support
 - Fetch middleware (onion-style `(request, next) => response`)
+- Class-based middleware with constructor DI via `NG_OPENAPI_SIGNALS_MIDDLEWARE` multi-provider
 - Auth header hooks
 - Custom default headers
 - Custom error mapping
@@ -164,23 +165,23 @@ ng-openapi-signals generate --input <openapi-file> --output <output-directory>
 
 ### Options
 
-| Option                            | Description                                                   |
-| --------------------------------- | ------------------------------------------------------------- |
-| `-i, --input <path>`              | Path to the OpenAPI JSON or YAML file                         |
-| `-o, --output <path>`             | Output directory for the generated Angular client             |
-| `-c, --config <path>`             | Path to config file (default: `ng-openapi-signals.config.ts`) |
-| `--clean`                         | Clean output directory before generation (default: true)      |
-| `--no-clean`                      | Preserve existing files in output directory                   |
-| `--group-by <tag\|path>`          | Group APIs by tag or path (default: tag)                      |
-| `--transport <fetch\|httpClient>` | HTTP transport (default: fetch)                               |
-| `--default-query-style <style>`   | Default query param style: form, spaceDelimited, pipeDelimited, or deepObject |
-| `--default-query-explode <bool>` | Default query param explode (true/false)                      |
-| `--prefer-content-type <type>`   | Preferred request content type when multiple are offered       |
-| `--signal-mutations`             | Enable signal-based mutation methods (default: false)            |
-| `--date-transformer`            | Convert ISO-8601 date strings in JSON responses to Date objects (default: false) |
-| `--dry-run`                       | Print the files that would be generated without writing to disk |
-| `--check`                         | Verify generated output is up to date (exits 1 on mismatch; for CI) |
-| `--verbose`                       | Show detailed progress and file lists                         |
+| Option                            | Description                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------- |
+| `-i, --input <path>`              | Path to the OpenAPI JSON or YAML file                                            |
+| `-o, --output <path>`             | Output directory for the generated Angular client                                |
+| `-c, --config <path>`             | Path to config file (default: `ng-openapi-signals.config.ts`)                    |
+| `--clean`                         | Clean output directory before generation (default: true)                         |
+| `--no-clean`                      | Preserve existing files in output directory                                      |
+| `--group-by <tag\|path>`          | Group APIs by tag or path (default: tag)                                         |
+| `--transport <fetch\|httpClient>` | HTTP transport (default: fetch)                                                  |
+| `--default-query-style <style>`   | Default query param style: form, spaceDelimited, pipeDelimited, or deepObject    |
+| `--default-query-explode <bool>`  | Default query param explode (true/false)                                         |
+| `--prefer-content-type <type>`    | Preferred request content type when multiple are offered                         |
+| `--signal-mutations`              | Enable signal-based mutation methods (default: false)                            |
+| `--date-transformer`              | Convert ISO-8601 date strings in JSON responses to Date objects (default: false) |
+| `--dry-run`                       | Print the files that would be generated without writing to disk                  |
+| `--check`                         | Verify generated output is up to date (exits 1 on mismatch; for CI)              |
+| `--verbose`                       | Show detailed progress and file lists                                            |
 
 ### CI: verify generated output
 
@@ -319,7 +320,7 @@ Enable the feature via the config file or CLI:
 export default defineConfig({
   input: './openapi.json',
   output: './src/generated/api',
-  runtime: { signalMutations: true },
+  runtime: {signalMutations: true},
 });
 ```
 
@@ -327,7 +328,7 @@ export default defineConfig({
 ng-openapi-signals generate --signal-mutations
 ```
 
-> See [`RUNTIME.md`](./RUNTIME.md) for full details on `MaybeSignal<T>`, the `Mutation` interface, response parsing, and more.
+> See [`docs/RUNTIME.md`](./docs/RUNTIME.md) for full details on `MaybeSignal<T>`, the `Mutation` interface, response parsing, and more.
 
 ### Date Transformer
 
@@ -340,7 +341,7 @@ import {defineConfig} from 'ng-openapi-signals/config';
 export default defineConfig({
   input: './openapi.json',
   output: './src/generated/api',
-  runtime: { dateTransformer: true },
+  runtime: {dateTransformer: true},
 });
 ```
 
@@ -352,7 +353,7 @@ The transformer is applied automatically inside the generated client's JSON pars
 
 ### Example snippets
 
-The repository includes standalone, commented example files in [`examples/usage/`](./examples/usage/):
+The repository includes standalone, commented example files in [`docs/usage/`](./docs/usage/):
 
 - `resource-usage.ts` — GET endpoint with `resource()` and signals
 - `mutation-usage.ts` — POST/PUT/PATCH/DELETE as Promises
@@ -380,11 +381,11 @@ date-utils.ts        (only when runtime.dateTransformer is enabled)
 providers.ts
 ```
 
-- **`ApiFetchClient`** — wraps native `fetch()`, handles base URL, JSON/text/Blob responses, query params, abort signals, middleware, hooks, and error mapping.
+- **`ApiFetchClient`** — wraps native `fetch()`, handles base URL, JSON/text/Blob responses, query params, abort signals, middleware (function-based and class-based with DI), hooks, and error mapping.
 - **`ApiHttpClient`** — wraps Angular `HttpClient` (when `transport: 'httpClient'`), same feature set, integrates with `HttpInterceptors`.
-- **`provideNgOpenapiSignals()`** — configures the runtime (base URL, headers, auth, middleware, hooks, error mapper).
+- **`provideNgOpenapiSignals()`** — configures the runtime (base URL, headers, auth, function-based middleware array, hooks, error mapper). Class-based middleware is registered separately via the `NG_OPENAPI_SIGNALS_MIDDLEWARE` multi-provider token.
 
-> See [`RUNTIME.md`](./RUNTIME.md) for the full `provideNgOpenapiSignals()` API and all runtime extension points.
+> See [`docs/RUNTIME.md`](./docs/RUNTIME.md) for the full `provideNgOpenapiSignals()` API and all runtime extension points.
 
 ---
 
@@ -404,16 +405,16 @@ providers.ts
 
 #### `runtime`
 
-| Option              | Type                      | Default     | Description                                                                |
-| ------------------- | ------------------------- | ----------- | -------------------------------------------------------------------------- |
-| `transport`         | `'fetch' \| 'httpClient'` | `'fetch'`   | HTTP transport (`fetch` = native fetch, `httpClient` = Angular HttpClient) |
-| `defaultHeaders`    | `Record<string, string>`  | `{}`        | Static default headers baked into `provideNgOpenapiSignals` defaults       |
-| `responseTypeHints` | `boolean`                 | `true`      | Emit `responseType` hints in generated methods based on response content   |
-| `defaultQueryStyle` | `'form' \| 'spaceDelimited' \| 'pipeDelimited' \| 'deepObject'` | `'form'` | Default query param serialization style when the spec doesn't specify `style` |
-| `defaultQueryExplode` | `boolean`               | `true`      | Default `explode` flag for query params when the spec doesn't specify it  |
-| `preferContentType` | `string`                  | `'application/json'` | Preferred content type when a request body offers multiple media types  |
-| `signalMutations`   | `boolean`                 | `false`     | Generate `${operationId}Mutation()` methods with reactive signals for POST/PUT/PATCH/DELETE |
-| `dateTransformer`  | `boolean`                 | `false`     | Convert ISO-8601 date-time strings in JSON responses to `Date` instances (emits `date-utils.ts`) |
+| Option                | Type                                                            | Default              | Description                                                                                      |
+| --------------------- | --------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
+| `transport`           | `'fetch' \| 'httpClient'`                                       | `'fetch'`            | HTTP transport (`fetch` = native fetch, `httpClient` = Angular HttpClient)                       |
+| `defaultHeaders`      | `Record<string, string>`                                        | `{}`                 | Static default headers baked into `provideNgOpenapiSignals` defaults                             |
+| `responseTypeHints`   | `boolean`                                                       | `true`               | Emit `responseType` hints in generated methods based on response content                         |
+| `defaultQueryStyle`   | `'form' \| 'spaceDelimited' \| 'pipeDelimited' \| 'deepObject'` | `'form'`             | Default query param serialization style when the spec doesn't specify `style`                    |
+| `defaultQueryExplode` | `boolean`                                                       | `true`               | Default `explode` flag for query params when the spec doesn't specify it                         |
+| `preferContentType`   | `string`                                                        | `'application/json'` | Preferred content type when a request body offers multiple media types                           |
+| `signalMutations`     | `boolean`                                                       | `false`              | Generate `${operationId}Mutation()` methods with reactive signals for POST/PUT/PATCH/DELETE      |
+| `dateTransformer`     | `boolean`                                                       | `false`              | Convert ISO-8601 date-time strings in JSON responses to `Date` instances (emits `date-utils.ts`) |
 
 ### Using the `httpClient` transport
 
@@ -443,7 +444,7 @@ When `httpClient` is selected:
 
 - The generator emits `ApiHttpClient` instead of `ApiFetchClient`.
 - `provideNgOpenapiSignals()` does **not** include `provideHttpClient()` — register it yourself in your app config (e.g. `provideHttpClient(withInterceptors([...]))`) so you keep full control over interceptors and their order.
-- The `NG_OPENAPI_SIGNALS_MIDDLEWARE` token is not emitted.
+- The `NG_OPENAPI_SIGNALS_MIDDLEWARE` token and `ApiMiddleware` interface are not emitted. Use `HttpInterceptorFn` or class-based `HttpInterceptor` instead.
 - Generated API service methods (`resource()` loaders, mutations) remain identical — only the underlying client changes.
 
 ### Grouping
@@ -474,12 +475,12 @@ export default defineConfig({
 
 The generator supports OpenAPI parameter `style` and `explode` for query parameters:
 
-| Style             | `explode: true`              | `explode: false`              |
-| ----------------- | ---------------------------- | ------------------------------ |
-| `form` (default)  | `tags=a&tags=b` (repeated)    | `tags=a,b` (comma-separated)   |
-| `spaceDelimited`  | `tags=a&tags=b` (repeated)    | `tags=a b` (space-separated)   |
-| `pipeDelimited`   | `tags=a&tags=b` (repeated)    | `tags=a\|b` (pipe-separated)    |
-| `deepObject`      | `filters[status]=active`     | —                              |
+| Style            | `explode: true`            | `explode: false`             |
+| ---------------- | -------------------------- | ---------------------------- |
+| `form` (default) | `tags=a&tags=b` (repeated) | `tags=a,b` (comma-separated) |
+| `spaceDelimited` | `tags=a&tags=b` (repeated) | `tags=a b` (space-separated) |
+| `pipeDelimited`  | `tags=a&tags=b` (repeated) | `tags=a\|b` (pipe-separated) |
+| `deepObject`     | `filters[status]=active`   | —                            |
 
 Parameters with default style (`form` + `explode: true`) are passed as plain values for backward compatibility.
 Non-default styles are wrapped with metadata: `{ value: params.tags, style: 'spaceDelimited', explode: false }`.
@@ -491,13 +492,11 @@ The runtime builds a `FormData` object from the typed input. Binary parts (`form
 
 ```ts
 // OpenAPI: multipart/form-data with file + caption
-await this.usersApi.uploadUserAvatar(
-  { file: blob, caption: 'Profile photo' },
-  { id: 'usr_123' },
-);
+await this.usersApi.uploadUserAvatar({file: blob, caption: 'Profile photo'}, {id: 'usr_123'});
 ```
 
 The runtime automatically:
+
 - Builds `FormData` from the typed object
 - Appends `Blob` values directly (no JSON serialization)
 - Lets the browser set the `Content-Type` with the multipart boundary
@@ -526,7 +525,7 @@ Header names with hyphens (e.g. `X-Request-Id`) are properly quoted in TypeScrip
 
 ## Current Scope
 
-For the full list of planned features and milestones, see the [Roadmap](./ROADMAP.md).  
+For the full list of planned features and milestones, see the [Roadmap](./docs/ROADMAP.md).  
 For release notes and version history, see the [Changelog](./CHANGELOG.md).
 
 ## Design Philosophy

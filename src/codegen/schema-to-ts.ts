@@ -1,3 +1,5 @@
+import type {OpenAPISchema} from '../openapi';
+
 /**
  * Convert an OpenAPI schema object to a TypeScript type string.
  *
@@ -11,20 +13,20 @@
  * - `prefixItems` (OpenAPI 3.1) → tuple types
  * - arrays, primitives
  */
-export function schemaToTsType(schema: any): string {
+export function schemaToTsType(schema: OpenAPISchema | undefined): string {
   if (!schema) {
     return 'unknown';
   }
 
   // Composition keywords take precedence when there is no `type` / `enum` / `$ref`.
   if (schema.allOf) {
-    const parts = schema.allOf.map((sub: any) => schemaToTsType(sub));
+    const parts = schema.allOf.map((sub) => schemaToTsType(sub));
     return withNullable(parts.filter((p: string) => p && p !== 'unknown').join(' & '), schema);
   }
 
   if (schema.oneOf || schema.anyOf) {
-    const subs = (schema.oneOf ?? schema.anyOf) as any[];
-    const parts = subs.map((sub: any) => schemaToTsType(sub));
+    const subs = schema.oneOf ?? schema.anyOf ?? [];
+    const parts = subs.map((sub) => schemaToTsType(sub));
     return withNullable(parts.filter((p: string) => p && p !== 'unknown').join(' | '), schema);
   }
 
@@ -87,7 +89,7 @@ export function schemaToTsType(schema: any): string {
  * Handles both OpenAPI 3.0 (`nullable: true`) and OpenAPI 3.1
  * (`type: ['string', 'null']` — but that case is already split by the caller).
  */
-function withNullable(type: string, schema: any): string {
+function withNullable(type: string, schema: OpenAPISchema): string {
   if (!type || type === 'unknown') {
     return type;
   }
@@ -110,9 +112,9 @@ function withNullable(type: string, schema: any): string {
  * - `items` as a single schema → `T[]`
  * - `prefixItems` (OpenAPI 3.1) → tuple `[A, B, C]`
  */
-function arrayToTsType(schema: any): string {
+function arrayToTsType(schema: OpenAPISchema): string {
   if (schema.prefixItems) {
-    const tuple = schema.prefixItems.map((sub: any) => schemaToTsType(sub)).join(', ');
+    const tuple = schema.prefixItems.map((sub) => schemaToTsType(sub)).join(', ');
     return `[${tuple}]`;
   }
 
@@ -132,7 +134,7 @@ function arrayToTsType(schema: any): string {
  * - `additionalProperties: true` → `Record<string, unknown>`
  * - empty object → `Record<string, unknown>`
  */
-function objectToTsType(schema: any): string {
+function objectToTsType(schema: OpenAPISchema): string {
   const properties = schema.properties ?? {};
   const required = new Set<string>(schema.required ?? []);
   const propertyNames = Object.keys(properties);

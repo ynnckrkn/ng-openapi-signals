@@ -8,12 +8,12 @@ paths:
       operationId: getConfig
       tags: [Config]
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Config"
+                $ref: '#/components/schemas/Config'
 components:
   schemas:
     Config:
@@ -30,7 +30,7 @@ components:
         tags:
           type: object
           additionalProperties:
-            $ref: "#/components/schemas/Tag"
+            $ref: '#/components/schemas/Tag'
         settings:
           type: object
           additionalProperties: true

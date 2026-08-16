@@ -187,7 +187,11 @@ describe('toApiError', () => {
       status: 400,
       statusText: 'Bad Request',
       headers: {'content-type': 'application/problem+json'},
-      body: JSON.stringify({type: 'about:blank', title: 'Invalid Input', detail: 'name is required'}),
+      body: JSON.stringify({
+        type: 'about:blank',
+        title: 'Invalid Input',
+        detail: 'name is required',
+      }),
     });
 
     const error = await toApiError(response);

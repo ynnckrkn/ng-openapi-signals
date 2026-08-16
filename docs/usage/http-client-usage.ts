@@ -18,7 +18,7 @@ import {
   HttpInterceptorFn,
   HttpRequest,
 } from '@angular/common/http';
-import {provideNgOpenapiSignals} from '../generated/api';
+import {provideNgOpenapiSignals} from '../../examples/generated/api';
 
 // A custom interceptor example (implement as needed).
 const loggingInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {

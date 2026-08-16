@@ -14,8 +14,7 @@ const BASE_CONFIG: GeneratorConfig = {
  * transformDates — mirrors the generated runtime logic so we can
  * unit-test the behaviour without loading Angular.
  * ------------------------------------------------------------------ */
-const ISO_DATE_TIME =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/;
+const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/;
 
 function transformDates(body: unknown): unknown {
   if (body === null || body === undefined) {

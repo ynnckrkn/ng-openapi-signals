@@ -8,12 +8,12 @@ paths:
       operationId: getItems
       tags: [Items]
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Item"
+                $ref: '#/components/schemas/Item'
 components:
   schemas:
     Item:
@@ -33,8 +33,8 @@ components:
             type: string
         ref:
           nullable: true
-          $ref: "#/components/schemas/Item"
+          $ref: '#/components/schemas/Item'
         typedNull:
           type:
             - string
-            - "null"
+            - 'null'

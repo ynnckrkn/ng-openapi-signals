@@ -8,23 +8,23 @@ paths:
       operationId: getUsersMap
       tags: [Map]
       responses:
-        "200":
+        '200':
           description: A map of users keyed by id.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UsersMap"
+                $ref: '#/components/schemas/UsersMap'
   /settings:
     get:
       operationId: getSettings
       tags: [Map]
       responses:
-        "200":
+        '200':
           description: Open settings map.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SettingsMap"
+                $ref: '#/components/schemas/SettingsMap'
 components:
   schemas:
     User:
@@ -40,7 +40,7 @@ components:
     UsersMap:
       type: object
       additionalProperties:
-        $ref: "#/components/schemas/User"
+        $ref: '#/components/schemas/User'
     SettingsMap:
       type: object
       additionalProperties: true

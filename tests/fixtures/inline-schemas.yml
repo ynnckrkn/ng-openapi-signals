@@ -31,7 +31,7 @@ paths:
                         city:
                           type: string
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:

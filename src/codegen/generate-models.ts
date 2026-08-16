@@ -1,24 +1,33 @@
 import type {SchemaModel} from './types';
 import {kebabCase} from './naming';
 import {schemaToTsType} from './schema-to-ts';
+import type {OpenAPISchema} from '../openapi';
 
-export function extractSchemas(api: any): SchemaModel[] {
+/** Permissive OpenAPI document shape — only the fields we read. */
+interface OpenApiDocument {
+  components?: {
+    schemas?: Record<string, OpenAPISchema>;
+  };
+}
+
+export function extractSchemas(api: OpenApiDocument): SchemaModel[] {
   const schemas = api.components?.schemas ?? {};
 
-  return Object.entries(schemas).map(([name, schema]: [string, any]) => {
+  return Object.entries(schemas).map(([name, schema]) => {
     return extractSchemaModel(name, schema);
   });
 }
 
-function extractSchemaModel(name: string, schema: any): SchemaModel {
+function extractSchemaModel(name: string, schema: OpenAPISchema): SchemaModel {
   // Enum schema → named union type
   if (schema.enum) {
+    const enumNames = schema['x-enumNames'] ?? schema['x-enum-varnames'];
     return {
       name,
       kind: 'enum',
       properties: [],
       values: schema.enum as (string | number)[],
-      enumNames: schema['x-enumNames'] ?? schema['x-enum-varnames'],
+      ...(enumNames ? {enumNames} : {}),
     };
   }
 
@@ -46,11 +55,7 @@ function extractSchemaModel(name: string, schema: any): SchemaModel {
   // `Record<string, T>`. Without this the generator would emit an empty interface
   // (e.g. `export interface RecordResponse {}`), silently dropping the value
   // type and, for a schema named `Object`, shadowing the global `Object` type.
-  if (
-    schema.type === 'object' &&
-    !schema.properties &&
-    schema.additionalProperties !== undefined
-  ) {
+  if (schema.type === 'object' && !schema.properties && schema.additionalProperties !== undefined) {
     return {
       name,
       kind: 'alias',
@@ -66,13 +71,11 @@ function extractSchemaModel(name: string, schema: any): SchemaModel {
   return {
     name,
     kind: 'interface',
-    properties: Object.entries(properties).map(
-      ([propertyName, propertySchema]: [string, any]) => ({
-        name: propertyName,
-        type: schemaToTsType(propertySchema),
-        required: required.has(propertyName),
-      }),
-    ),
+    properties: Object.entries(properties).map(([propertyName, propertySchema]) => ({
+      name: propertyName,
+      type: schemaToTsType(propertySchema),
+      required: required.has(propertyName),
+    })),
   };
 }
 

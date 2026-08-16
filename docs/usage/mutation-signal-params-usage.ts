@@ -16,7 +16,7 @@
 // Adjust the import path to point at your generated client directory.
 
 import {Component, inject, signal} from '@angular/core';
-import {UsersApi} from '../generated/api';
+import {UsersApi} from '../../examples/generated/api';
 
 @Component({
   selector: 'app-avatar-upload',

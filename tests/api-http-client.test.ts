@@ -71,7 +71,7 @@ interface ApiRequestOptions {
   body?: unknown;
   formData?: Record<string, unknown>;
   contentType?: string;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
 }
 
@@ -112,7 +112,7 @@ interface ClientDeps {
   errorMapper?: ApiErrorMapper;
   onRequest?: ApiRequestHook;
   onResponse?: ApiResponseHook;
-  http: {request: (...args: any[]) => any};
+  http: {request: (...args: unknown[]) => unknown};
 }
 
 function appendQueryParam(
@@ -268,17 +268,16 @@ function createClient(deps: ClientDeps) {
     const responseType = mapResponseType(options.responseType);
 
     try {
-      const response = (await deps.http
-        .request(context.method, context.url, {
-          headers: context.headers,
-          ...(context.body !== undefined ? {body: context.body} : {}),
-          observe: 'response',
-          ...(responseType
-            ? {responseType: responseType as 'json' | 'text' | 'blob' | 'arraybuffer'}
-            : {}),
-          ...(options.signal ? {signal: options.signal} : {}),
-        })
-        .toPromise()) as HttpResponseStub<unknown>;
+      const observable = (await deps.http.request(context.method, context.url, {
+        headers: context.headers,
+        ...(context.body !== undefined ? {body: context.body} : {}),
+        observe: 'response',
+        ...(responseType
+          ? {responseType: responseType as 'json' | 'text' | 'blob' | 'arraybuffer'}
+          : {}),
+        ...(options.signal ? {signal: options.signal} : {}),
+      })) as ObservableStub<unknown>;
+      const response = (await observable.toPromise()) as HttpResponseStub<unknown>;
 
       if (deps.onResponse) {
         await deps.onResponse(response);
@@ -394,7 +393,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'POST', path: '/users', body: {name: 'John'}});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).toHaveProperty('Content-Type', 'application/json');
       expect(opts.body).toEqual({name: 'John'});
@@ -407,7 +406,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).not.toHaveProperty('Content-Type');
     });
@@ -423,7 +422,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).toHaveProperty('X-Client', 'ng-openapi-signals');
       expect(opts.headers).toHaveProperty('Accept', 'application/json');
@@ -440,7 +439,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users', headers: {'X-Client': 'override'}});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).toHaveProperty('X-Client', 'override');
     });
@@ -458,7 +457,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).toHaveProperty('Authorization', 'Bearer token-123');
     });
@@ -477,7 +476,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).toHaveProperty('Authorization', 'Bearer async');
     });
@@ -489,7 +488,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).not.toHaveProperty('Authorization');
     });
@@ -577,7 +576,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.headers).toHaveProperty('X-Hook', 'yes');
     });
@@ -622,7 +621,7 @@ describe('ApiHttpClient request logic', () => {
         contentType: 'multipart/form-data',
       });
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.body).toBeInstanceOf(FormData);
     });
@@ -639,7 +638,7 @@ describe('ApiHttpClient request logic', () => {
         contentType: 'application/x-www-form-urlencoded',
       });
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.body).toBe('names=a%2Cb&count=1');
       expect(opts.headers).toHaveProperty('Content-Type', 'application/x-www-form-urlencoded');
@@ -658,7 +657,7 @@ describe('ApiHttpClient request logic', () => {
         contentType: 'application/octet-stream',
       });
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.body).toBe(blob);
       expect(opts.headers).toHaveProperty('Content-Type', 'application/octet-stream');
@@ -679,7 +678,7 @@ describe('ApiHttpClient request logic', () => {
 
       await client.request({method: 'POST', path: '/users', body: null});
 
-      const callArgs = (http.request as any).mock.calls[0];
+      const callArgs = (http.request as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = callArgs?.[2];
       expect(opts.body).toBeUndefined();
       expect(opts.headers).not.toHaveProperty('Content-Type');

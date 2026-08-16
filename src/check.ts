@@ -1,4 +1,5 @@
 import {readFile, readdir, stat} from 'node:fs/promises';
+import type {Dirent} from 'node:fs';
 import {join} from 'node:path';
 import {generateFiles, formatFiles} from './generate';
 import type {GeneratorConfig} from './codegen/types';
@@ -27,9 +28,7 @@ export function checkPassed(result: CheckResult): boolean {
  * Compares the in-memory generated output against the existing files on
  * disk, without writing anything. Used by `--check` for CI verification.
  */
-export async function checkFiles(
-  config: GeneratorConfig,
-): Promise<CheckResult> {
+export async function checkFiles(config: GeneratorConfig): Promise<CheckResult> {
   const generated = await formatFiles(await generateFiles(config));
 
   const diskFiles = await listFiles(config.output);
@@ -62,7 +61,7 @@ export async function checkFiles(
 
 /** Recursively lists all files under `dir` as paths relative to `dir` (forward slashes). */
 async function listFiles(dir: string): Promise<string[]> {
-  let entries: string[];
+  let entries: Dirent[];
 
   try {
     await stat(dir);

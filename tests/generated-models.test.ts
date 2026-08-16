@@ -29,10 +29,7 @@ describe('generated models', () => {
   });
 
   it('generates CreateUserRequest interface with correct properties', async () => {
-    const content = await readFile(
-      join(OUTPUT_DIR, 'models', 'create-user-request.ts'),
-      'utf8',
-    );
+    const content = await readFile(join(OUTPUT_DIR, 'models', 'create-user-request.ts'), 'utf8');
     expect(content).toContain('export interface CreateUserRequest {');
     expect(content).toContain('name: string;');
     expect(content).toContain('email?: string;');

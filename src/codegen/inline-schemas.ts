@@ -1,4 +1,42 @@
 import {pascalCase} from './naming';
+import type {OpenAPISchema} from '../openapi';
+
+/** Permissive OpenAPI document shape — only the fields we walk. */
+interface OpenApiDocument {
+  components?: {
+    schemas?: Record<string, OpenAPISchema>;
+  };
+  paths?: Record<string, OpenApiPathItem>;
+}
+
+/** A single path item (collection of operations + path-level parameters). */
+interface OpenApiPathItem {
+  get?: OpenApiOperation;
+  post?: OpenApiOperation;
+  put?: OpenApiOperation;
+  patch?: OpenApiOperation;
+  delete?: OpenApiOperation;
+  head?: OpenApiOperation;
+  options?: OpenApiOperation;
+  parameters?: OpenApiParameter[];
+}
+
+/** HTTP methods that map to operations on a path item. */
+type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
+
+/** An operation (e.g. GET /users). */
+interface OpenApiOperation {
+  operationId?: string;
+  parameters?: OpenApiParameter[];
+  requestBody?: {content?: Record<string, {schema?: OpenAPISchema}>};
+  responses?: Record<string, {content?: Record<string, {schema?: OpenAPISchema}>}>;
+}
+
+/** A parameter (path/query/header/cookie). */
+interface OpenApiParameter {
+  name: string;
+  schema?: OpenAPISchema;
+}
 
 /**
  * Walks an OpenAPI document and hoists anonymous object schemas into
@@ -16,7 +54,7 @@ import {pascalCase} from './naming';
  * - Parameter: `<operationId><ParamName>` (e.g. `searchUsersLimit`)
  * - Fallback: `InlineSchema`, `InlineSchema2`, ...
  */
-export function hoistInlineSchemas(api: any): void {
+export function hoistInlineSchemas(api: OpenApiDocument): void {
   // Ensure components.schemas exists before referencing it.
   if (!api.components) {
     api.components = {};
@@ -46,7 +84,7 @@ export function hoistInlineSchemas(api: any): void {
     return candidate;
   }
 
-  function isHoistable(schema: any): boolean {
+  function isHoistable(schema: OpenAPISchema | undefined): boolean {
     if (!schema || typeof schema !== 'object') {
       return false;
     }
@@ -81,26 +119,24 @@ export function hoistInlineSchemas(api: any): void {
     return false;
   }
 
-  function hoist(schema: any, nameHint: string): any {
+  function hoist(schema: OpenAPISchema | undefined, nameHint: string): OpenAPISchema {
     if (!schema || typeof schema !== 'object') {
-      return schema;
+      return schema ?? ({} as OpenAPISchema);
     }
 
     // Recurse into composition keywords first so nested inline objects get hoisted.
     if (schema.allOf) {
-      schema.allOf = schema.allOf.map((sub: any, i: number) =>
-        hoist(sub, `${nameHint}Item${i}`),
-      );
+      schema.allOf = schema.allOf.map((sub, i) => hoist(sub, `${nameHint}Item${i}`));
     }
 
     if (schema.oneOf) {
-      schema.oneOf = schema.oneOf.map((sub: any, i: number) =>
+      schema.oneOf = schema.oneOf.map((sub, i) =>
         hoist(sub, `${nameHint}Variant${i}`),
       );
     }
 
     if (schema.anyOf) {
-      schema.anyOf = schema.anyOf.map((sub: any, i: number) =>
+      schema.anyOf = schema.anyOf.map((sub, i) =>
         hoist(sub, `${nameHint}Variant${i}`),
       );
     }
@@ -111,7 +147,7 @@ export function hoistInlineSchemas(api: any): void {
     }
 
     if (schema.prefixItems) {
-      schema.prefixItems = schema.prefixItems.map((sub: any, i: number) =>
+      schema.prefixItems = schema.prefixItems.map((sub, i) =>
         hoist(sub, `${nameHint}Item${i}`),
       );
     }
@@ -124,7 +160,10 @@ export function hoistInlineSchemas(api: any): void {
     // Recurse into object properties.
     if (schema.properties) {
       for (const [propName, propSchema] of Object.entries(schema.properties)) {
-        schema.properties[propName] = hoist(propSchema as any, `${nameHint}${pascalCase(propName)}`);
+        schema.properties[propName] = hoist(
+          propSchema,
+          `${nameHint}${pascalCase(propName)}`,
+        );
       }
     }
 
@@ -142,23 +181,23 @@ export function hoistInlineSchemas(api: any): void {
 
   // Walk named schemas — hoist their inline property schemas.
   for (const [schemaName, schema] of Object.entries(api.components.schemas)) {
-    const s = schema as any;
+    const s = schema;
     if (s && s.properties) {
       for (const [propName, propSchema] of Object.entries(s.properties)) {
-        s.properties[propName] = hoist(propSchema as any, `${schemaName}${pascalCase(propName)}`);
+        s.properties[propName] = hoist(propSchema, `${schemaName}${pascalCase(propName)}`);
       }
     }
 
     if (s && s.allOf) {
-      s.allOf = s.allOf.map((sub: any, i: number) => hoist(sub, `${schemaName}Item${i}`));
+      s.allOf = s.allOf.map((sub, i) => hoist(sub, `${schemaName}Item${i}`));
     }
 
     if (s && s.oneOf) {
-      s.oneOf = s.oneOf.map((sub: any, i: number) => hoist(sub, `${schemaName}Variant${i}`));
+      s.oneOf = s.oneOf.map((sub, i) => hoist(sub, `${schemaName}Variant${i}`));
     }
 
     if (s && s.anyOf) {
-      s.anyOf = s.anyOf.map((sub: any, i: number) => hoist(sub, `${schemaName}Variant${i}`));
+      s.anyOf = s.anyOf.map((sub, i) => hoist(sub, `${schemaName}Variant${i}`));
     }
 
     if (s && s.items) {
@@ -172,8 +211,8 @@ export function hoistInlineSchemas(api: any): void {
 
   // Walk paths — hoist inline schemas in parameters, request bodies, responses.
   for (const [path, pathItem] of Object.entries(api.paths ?? {})) {
-    const item = pathItem as any;
-    const methods = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+    const item = pathItem;
+    const methods: HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
 
     for (const method of methods) {
       const operation = item[method];
@@ -193,21 +232,18 @@ export function hoistInlineSchemas(api: any): void {
       // Request body
       if (operation.requestBody?.content) {
         for (const content of Object.values(operation.requestBody.content)) {
-          const c = content as any;
-          if (c.schema) {
-            c.schema = hoist(c.schema, `${operationId}Request`);
+          if (content.schema) {
+            content.schema = hoist(content.schema, `${operationId}Request`);
           }
         }
       }
 
       // Responses
       for (const response of Object.values(operation.responses ?? {})) {
-        const resp = response as any;
-        if (resp.content) {
-          for (const content of Object.values(resp.content)) {
-            const c = content as any;
-            if (c.schema) {
-              c.schema = hoist(c.schema, `${operationId}Response`);
+        if (response.content) {
+          for (const content of Object.values(response.content)) {
+            if (content.schema) {
+              content.schema = hoist(content.schema, `${operationId}Response`);
             }
           }
         }

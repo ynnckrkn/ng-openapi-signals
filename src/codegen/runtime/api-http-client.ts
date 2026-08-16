@@ -6,9 +6,7 @@ export function generateApiHttpClient(config: GeneratorConfig): string {
   const responseTypeField = responseTypeHints
     ? `  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';\n`
     : '';
-  const dateUtilsImport = dateTransformer
-    ? `import { transformDates } from './date-utils';\n`
-    : '';
+  const dateUtilsImport = dateTransformer ? `import { transformDates } from './date-utils';\n` : '';
 
   return `import { Service, inject } from '@angular/core';
 ${dateUtilsImport}import { HttpClient, HttpErrorResponse, HttpResponse } from '@angular/common/http';
@@ -54,7 +52,7 @@ export interface ApiRequestOptions {
    * Content-Type is set automatically by the browser (multipart boundary).
    */
   contentType?: string;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
 ${responseTypeField}}
 
 @Service()

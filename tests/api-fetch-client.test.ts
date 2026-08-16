@@ -17,7 +17,7 @@ interface ApiRequestOptions {
   body?: unknown;
   formData?: Record<string, unknown>;
   contentType?: string;
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
 }
 
@@ -26,10 +26,17 @@ interface ApiRequestContext {
   init: RequestInit;
 }
 
-type ApiMiddleware = (
+type ApiMiddlewareFn = (
   request: ApiRequestContext,
   next: () => Promise<Response>,
 ) => Promise<Response>;
+
+interface ApiMiddleware {
+  handle(request: ApiRequestContext, next: () => Promise<Response>): Promise<Response>;
+}
+
+type ApiMiddlewareEntry = ApiMiddlewareFn | ApiMiddleware;
+
 type ApiAuthHook = () => Record<string, string> | Promise<Record<string, string>>;
 type ApiErrorMapper = (response: Response) => Promise<unknown>;
 type ApiRequestHook = (request: ApiRequestContext) => void | Promise<void>;
@@ -37,7 +44,7 @@ type ApiResponseHook = (response: Response) => void | Promise<void>;
 
 interface ClientDeps {
   baseUrl: string;
-  middleware?: ReadonlyArray<ApiMiddleware>;
+  middleware?: ReadonlyArray<ApiMiddlewareEntry>;
   auth?: ApiAuthHook;
   defaultHeaders?: Record<string, string>;
   errorMapper?: ApiErrorMapper;
@@ -73,7 +80,11 @@ function appendQueryParam(
   }
 }
 
-function buildUrl(baseUrl: string, path: string, query?: Record<string, unknown | QueryParamOptions>): string {
+function buildUrl(
+  baseUrl: string,
+  path: string,
+  query?: Record<string, unknown | QueryParamOptions>,
+): string {
   const url = new URL(path, baseUrl);
 
   for (const [key, raw] of Object.entries(query ?? {})) {
@@ -160,7 +171,10 @@ async function parseBody(
   return response.blob();
 }
 
-function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; contentType: string | undefined } {
+function prepareBody(options: ApiRequestOptions): {
+  body: BodyInit | undefined;
+  contentType: string | undefined;
+} {
   // FormData takes precedence over body.
   if (options.formData !== undefined) {
     // For application/x-www-form-urlencoded, build URLSearchParams.
@@ -198,7 +212,10 @@ function prepareBody(options: ApiRequestOptions): { body: BodyInit | undefined; 
     ) {
       return {body: options.body as BodyInit, contentType: options.contentType};
     }
-    return {body: JSON.stringify(options.body), contentType: options.contentType ?? 'application/json'};
+    return {
+      body: JSON.stringify(options.body),
+      contentType: options.contentType ?? 'application/json',
+    };
   }
 
   return {body: undefined, contentType: undefined};
@@ -254,7 +271,8 @@ function createClient(deps: ClientDeps) {
     const coreFetch = async (): Promise<Response> => deps.fetchFn(context.url, context.init);
 
     const pipeline = middleware.reduceRight<() => Promise<Response>>(
-      (next, mw) => async () => mw(context, next),
+      (next, mw) => async () =>
+        typeof mw === 'function' ? mw(context, next) : mw.handle(context, next),
       coreFetch,
     );
 
@@ -449,7 +467,8 @@ describe('ApiFetchClient request logic', () => {
         body: {name: 'John'},
       });
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('Content-Type', 'application/json');
       expect(callArgs?.body).toBe(JSON.stringify({name: 'John'}));
@@ -466,7 +485,8 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).not.toHaveProperty('Content-Type');
     });
@@ -486,7 +506,8 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('X-Client', 'ng-openapi-signals');
       expect(headers).toHaveProperty('Accept', 'application/json');
@@ -507,7 +528,8 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users', headers: {'X-Client': 'override'}});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('X-Client', 'override');
     });
@@ -529,7 +551,8 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('Authorization', 'Bearer token-123');
     });
@@ -552,7 +575,8 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('Authorization', 'Bearer async');
     });
@@ -568,7 +592,8 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).not.toHaveProperty('Authorization');
     });
@@ -583,13 +608,13 @@ describe('ApiFetchClient request logic', () => {
       });
       const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
 
-      const mw1: ApiMiddleware = async (_req, next) => {
+      const mw1: ApiMiddlewareFn = async (_req, next) => {
         order.push('mw1-before');
         const res = await next();
         order.push('mw1-after');
         return res;
       };
-      const mw2: ApiMiddleware = async (_req, next) => {
+      const mw2: ApiMiddlewareFn = async (_req, next) => {
         order.push('mw2-before');
         const res = await next();
         order.push('mw2-after');
@@ -610,7 +635,7 @@ describe('ApiFetchClient request logic', () => {
       const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
 
       let capturedUrl: string | undefined;
-      const mw: ApiMiddleware = async (req, next) => {
+      const mw: ApiMiddlewareFn = async (req, next) => {
         capturedUrl = req.url;
         return next();
       };
@@ -628,7 +653,7 @@ describe('ApiFetchClient request logic', () => {
       });
       const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
 
-      const mw: ApiMiddleware = async (req, next) => {
+      const mw: ApiMiddlewareFn = async (req, next) => {
         const headers = req.init.headers as Record<string, string>;
         req.init = {...req.init, headers: {...headers, 'X-Mw': 'added'}};
         return next();
@@ -637,7 +662,8 @@ describe('ApiFetchClient request logic', () => {
       const client = createClient({baseUrl, middleware: [mw], fetchFn});
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('X-Mw', 'added');
     });
@@ -649,7 +675,7 @@ describe('ApiFetchClient request logic', () => {
         headers: {'content-type': 'application/json'},
       });
 
-      const mw: ApiMiddleware = async () => customResponse;
+      const mw: ApiMiddlewareFn = async () => customResponse;
 
       const client = createClient({baseUrl, middleware: [mw], fetchFn});
       const result = await client.request<{custom: boolean}>({method: 'GET', path: '/users'});
@@ -670,6 +696,130 @@ describe('ApiFetchClient request logic', () => {
 
       expect(fetchFn).toHaveBeenCalledOnce();
     });
+
+    it('runs class-based middleware via handle()', async () => {
+      const order: string[] = [];
+      const response = new Response(JSON.stringify({ok: true}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
+
+      class LoggingMiddleware implements ApiMiddleware {
+        async handle(_req: ApiRequestContext, next: () => Promise<Response>) {
+          order.push('class-before');
+          const res = await next();
+          order.push('class-after');
+          return res;
+        }
+      }
+
+      const client = createClient({
+        baseUrl,
+        middleware: [new LoggingMiddleware()],
+        fetchFn,
+      });
+      await client.request({method: 'GET', path: '/users'});
+
+      expect(order).toEqual(['class-before', 'class-after']);
+      expect(fetchFn).toHaveBeenCalledOnce();
+    });
+
+    it('runs mixed function and class middleware in onion order', async () => {
+      const order: string[] = [];
+      const response = new Response(JSON.stringify({ok: true}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
+
+      const fnMw: ApiMiddlewareFn = async (_req, next) => {
+        order.push('fn-before');
+        const res = await next();
+        order.push('fn-after');
+        return res;
+      };
+
+      class ClassMw implements ApiMiddleware {
+        async handle(_req: ApiRequestContext, next: () => Promise<Response>) {
+          order.push('class-before');
+          const res = await next();
+          order.push('class-after');
+          return res;
+        }
+      }
+
+      const client = createClient({
+        baseUrl,
+        middleware: [fnMw, new ClassMw()],
+        fetchFn,
+      });
+      await client.request({method: 'GET', path: '/users'});
+
+      expect(order).toEqual(['fn-before', 'class-before', 'class-after', 'fn-after']);
+    });
+
+    it('supports constructor DI in class-based middleware', async () => {
+      const response = new Response(JSON.stringify({ok: true}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+      const fetchFn = vi.fn().mockResolvedValue(response) as unknown as typeof fetch;
+
+      // Simulate a DI-injected dependency (e.g. AuthService) passed via
+      // constructor, mirroring Angular's constructor injection semantics.
+      const fakeAuthService = {getToken: () => 'token-123'};
+      class AuthMiddleware implements ApiMiddleware {
+        constructor(private auth: {getToken: () => string}) {}
+        async handle(req: ApiRequestContext, next: () => Promise<Response>) {
+          const headers = req.init.headers as Record<string, string>;
+          req.init = {
+            ...req.init,
+            headers: {...headers, Authorization: `Bearer ${this.auth.getToken()}`},
+          };
+          return next();
+        }
+      }
+
+      const client = createClient({
+        baseUrl,
+        middleware: [new AuthMiddleware(fakeAuthService)],
+        fetchFn,
+      });
+      await client.request({method: 'GET', path: '/users'});
+
+      const callArgs = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
+      const headers = callArgs?.headers as Record<string, string>;
+      expect(headers).toHaveProperty('Authorization', 'Bearer token-123');
+    });
+
+    it('allows class middleware to short-circuit', async () => {
+      const fetchFn = vi.fn() as unknown as typeof fetch;
+      const customResponse = new Response(JSON.stringify({custom: true}), {
+        status: 200,
+        headers: {'content-type': 'application/json'},
+      });
+
+      class ShortCircuitMiddleware implements ApiMiddleware {
+        async handle() {
+          return customResponse;
+        }
+      }
+
+      const client = createClient({
+        baseUrl,
+        middleware: [new ShortCircuitMiddleware()],
+        fetchFn,
+      });
+      const result = await client.request<{custom: boolean}>({
+        method: 'GET',
+        path: '/users',
+      });
+
+      expect(result).toEqual({custom: true});
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
   });
 
   describe('error handling', () => {
@@ -677,21 +827,20 @@ describe('ApiFetchClient request logic', () => {
       const response = new Response('Not Found', {status: 404, statusText: 'Not Found'});
       const client = createClient({baseUrl, fetchFn: mockFetch(response)});
 
-      await expect(
-        client.request({method: 'GET', path: '/users/999'}),
-      ).rejects.toThrow('HTTP 404');
+      await expect(client.request({method: 'GET', path: '/users/999'})).rejects.toThrow('HTTP 404');
     });
 
     it('uses a custom error mapper when provided', async () => {
       const response = new Response('Forbidden', {status: 403, statusText: 'Forbidden'});
-      const customMapper: ApiErrorMapper = async (res) =>
-        new Error(`Custom ${res.status}`);
+      const customMapper: ApiErrorMapper = async (res) => new Error(`Custom ${res.status}`);
 
-      const client = createClient({baseUrl, errorMapper: customMapper, fetchFn: mockFetch(response)});
+      const client = createClient({
+        baseUrl,
+        errorMapper: customMapper,
+        fetchFn: mockFetch(response),
+      });
 
-      await expect(
-        client.request({method: 'GET', path: '/secret'}),
-      ).rejects.toThrow('Custom 403');
+      await expect(client.request({method: 'GET', path: '/secret'})).rejects.toThrow('Custom 403');
     });
   });
 
@@ -762,7 +911,8 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'GET', path: '/users'});
 
-      const callArgs = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('X-Hook', 'yes');
     });
@@ -833,7 +983,8 @@ describe('ApiFetchClient request logic', () => {
         contentType: 'multipart/form-data',
       });
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       expect(callArgs?.body).toBeInstanceOf(FormData);
       // Content-Type should NOT be set for multipart (browser sets boundary)
       const headers = callArgs?.headers as Record<string, string>;
@@ -856,7 +1007,8 @@ describe('ApiFetchClient request logic', () => {
         contentType: 'application/x-www-form-urlencoded',
       });
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       expect(callArgs?.body).toBe('names=a%2Cb&count=1');
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('Content-Type', 'application/x-www-form-urlencoded');
@@ -879,7 +1031,8 @@ describe('ApiFetchClient request logic', () => {
         contentType: 'application/octet-stream',
       });
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       expect(callArgs?.body).toBe(blob);
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('Content-Type', 'application/octet-stream');
@@ -901,7 +1054,8 @@ describe('ApiFetchClient request logic', () => {
         contentType: 'application/vnd.custom+json',
       });
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).toHaveProperty('Content-Type', 'application/vnd.custom+json');
     });
@@ -939,21 +1093,23 @@ describe('ApiFetchClient request logic', () => {
 
       await client.request({method: 'POST', path: '/users', body: null});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       expect(callArgs?.body).toBeUndefined();
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).not.toHaveProperty('Content-Type');
     });
 
     it('does not send Content-Type when body is null', async () => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response(null, {status: 204}),
-      ) as unknown as typeof fetch;
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(null, {status: 204})) as unknown as typeof fetch;
       const client = createClient({baseUrl, fetchFn: fetchMock});
 
       await client.request({method: 'DELETE', path: '/users/1', body: null});
 
-      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+      const callArgs = (fetchMock as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[1] as RequestInit;
       const headers = callArgs?.headers as Record<string, string>;
       expect(headers).not.toHaveProperty('Content-Type');
     });

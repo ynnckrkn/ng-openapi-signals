@@ -19,7 +19,7 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: User list.
           content:
             application/json:
@@ -43,5 +43,5 @@ paths:
           schema:
             type: string
       responses:
-        "204":
+        '204':
           description: Deleted.

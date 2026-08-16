@@ -13,12 +13,12 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: '#/components/schemas/User'
     delete:
       tags: [Users]
       parameters:
@@ -28,20 +28,20 @@ paths:
           schema:
             type: string
       responses:
-        "204":
+        '204':
           description: deleted
   /users:
     get:
       tags: [Users]
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/User"
+                  $ref: '#/components/schemas/User'
     post:
       tags: [Users]
       requestBody:
@@ -49,14 +49,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/User"
+              $ref: '#/components/schemas/User'
       responses:
-        "201":
+        '201':
           description: created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: '#/components/schemas/User'
 components:
   schemas:
     User:

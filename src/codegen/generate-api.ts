@@ -9,6 +9,56 @@ import type {
 } from './types';
 import {camelCase, kebabCase, pascalCase, serviceNameFromTag} from './naming';
 import {schemaToTsType} from './schema-to-ts';
+import type {OpenAPISchema} from '../openapi';
+
+/** Permissive OpenAPI document shape — only the fields we walk. */
+interface OpenApiDocument {
+  paths?: Record<string, OpenApiPathItem>;
+}
+
+/** A single path item (collection of operations + path-level parameters). */
+interface OpenApiPathItem {
+  get?: OpenApiOperation;
+  post?: OpenApiOperation;
+  put?: OpenApiOperation;
+  patch?: OpenApiOperation;
+  delete?: OpenApiOperation;
+  parameters?: OpenApiParameter[];
+}
+
+/** An operation (e.g. GET /users). */
+interface OpenApiOperation {
+  operationId?: string;
+  tags?: string[];
+  parameters?: OpenApiParameter[];
+  requestBody?: OpenApiRequestBody;
+  responses?: Record<string, OpenApiResponse>;
+}
+
+/** A parameter (path/query/header/cookie). */
+interface OpenApiParameter {
+  name: string;
+  in: 'path' | 'query' | 'header' | 'cookie';
+  required?: boolean;
+  schema?: OpenAPISchema;
+  style?: QueryStyle;
+  explode?: boolean;
+}
+
+/** A response object. */
+interface OpenApiResponse {
+  content?: Record<string, OpenApiContent>;
+}
+
+/** A media-type content entry. */
+interface OpenApiContent {
+  schema?: OpenAPISchema;
+}
+
+/** A request body object. */
+interface OpenApiRequestBody {
+  content?: Record<string, OpenApiContent>;
+}
 
 const HTTP_METHODS: HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete'];
 
@@ -17,10 +67,10 @@ const DEFAULT_QUERY_STYLE: QueryStyle = 'form';
 /** Default explode per OpenAPI spec: `true` for `form` style query params. */
 const DEFAULT_QUERY_EXPLODE = true;
 
-export function extractOperations(api: any): OperationModel[] {
+export function extractOperations(api: OpenApiDocument): OperationModel[] {
   const operations: OperationModel[] = [];
 
-  for (const [path, pathItem] of Object.entries(api.paths ?? {}) as [string, any][]) {
+  for (const [path, pathItem] of Object.entries(api.paths ?? {})) {
     for (const method of HTTP_METHODS) {
       const operation = pathItem[method];
 
@@ -31,15 +81,15 @@ export function extractOperations(api: any): OperationModel[] {
       const parameters = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])];
 
       const pathParams = parameters
-        .filter((parameter: any) => parameter.in === 'path')
+        .filter((parameter) => parameter.in === 'path')
         .map(toParameterModel);
 
       const queryParams = parameters
-        .filter((parameter: any) => parameter.in === 'query')
+        .filter((parameter) => parameter.in === 'query')
         .map(toParameterModel);
 
       const headerParams = parameters
-        .filter((parameter: any) => parameter.in === 'header')
+        .filter((parameter) => parameter.in === 'header')
         .map(toParameterModel);
 
       const requestBody = extractRequestBody(operation);
@@ -184,8 +234,16 @@ function generateResourceMethod(operation: OperationModel, responseTypeHints: bo
   requestLines.push('signal: abortSignal');
   const requestBody = requestLines.map((line) => `          ${line}`).join('\n');
 
+  // The loader's `params` is the resolved (non-signal) type. Angular narrows
+  // `params` to `Exclude<R, undefined>` when the params factory can return
+  // `undefined`, so the loader only runs with a concrete params object.
+  const resolvedParamsType = generateResolvedParamsType(operation);
+  const loaderParamsType = resolvedParamsType.endsWith(' | undefined')
+    ? resolvedParamsType.slice(0, -' | undefined'.length)
+    : resolvedParamsType;
+
   const loaderSignature = hasParams
-    ? `loader: ({ params, abortSignal }: { params: ${resourceParamsType}; abortSignal: AbortSignal }) =>`
+    ? `loader: ({ params, abortSignal }: { params: ${loaderParamsType}; abortSignal: AbortSignal }) =>`
     : `loader: ({ abortSignal }: { abortSignal: AbortSignal }) =>`;
 
   return `  ${operation.operationId}Resource(${paramsArg}) {
@@ -208,15 +266,23 @@ function generateResolvedParamsType(operation: OperationModel): string {
 
   const properties = params
     .map((param) => {
+      // With `exactOptionalPropertyTypes`, an optional property `q?: string`
+      // does not accept `undefined` as a value. The params factory always
+      // assigns every property (even optional ones) via `readSignalOrValue`,
+      // which yields `T | undefined`. Append `| undefined` to optional
+      // properties so the resolved type accepts an explicit `undefined` value.
       const optional = param.required ? '' : '?';
+      const type = param.required ? param.type : `${param.type} | undefined`;
       const name = formatParamName(param);
-      return `    ${name}${optional}: ${param.type};`;
+      return `    ${name}${optional}: ${type};`;
     })
     .join('\n');
 
+  // Allow `undefined` so the params factory can return `undefined` to keep
+  // the resource in Angular's idle state (loader is not invoked).
   return `{
 ${properties}
-  }`;
+  } | undefined`;
 }
 
 function generateMutationMethod(operation: OperationModel, responseTypeHints: boolean): string {
@@ -298,7 +364,10 @@ function generateSignalMutationMethod(operation: OperationModel): string {
     forwardedArgs.push('mutationBody');
   }
   if (hasParams) {
-    forwardedArgs.push(generateResourceParamsExpression(operation));
+    // Mutations are triggered on demand via `mutate(body)`, so there is no
+    // idle-state concern — always resolve to the concrete (non-undefined)
+    // params object instead of reusing the idle-capable resource expression.
+    forwardedArgs.push(generateResolvedParamsObject(operation));
   }
   forwardedArgs.push('mutationSignal');
   const forwardedCall = forwardedArgs.join(', ');
@@ -331,6 +400,48 @@ ${properties}
 }
 
 function generateResourceParamsExpression(operation: OperationModel): string {
+  const params = [...operation.pathParams, ...operation.queryParams, ...operation.headerParams];
+
+  if (params.length === 0) {
+    return 'undefined';
+  }
+
+  const requiredParams = params.filter((p) => p.required);
+
+  // Build the resolved params object with signals unwrapped.
+  const properties = params
+    .map(
+      (param) =>
+        `        ${formatParamName(param)}: readSignalOrValue(${formatParamAccess(param)})`,
+    )
+    .join(',\n');
+
+  // When all required params resolve to undefined, return undefined to keep
+  // the resource in idle state (no HTTP request). This allows callers to pass
+  // signal(undefined) for required params until they are ready (e.g. after
+  // authentication), preventing premature 401 responses.
+  if (requiredParams.length === 0) {
+    // No required params — always resolve (optional params can be undefined).
+    return `{
+${properties}
+      }`;
+  }
+
+  const requiredChecks = requiredParams
+    .map((p) => `readSignalOrValue(${formatParamAccess(p)}) === undefined`)
+    .join(' || ');
+
+  return `(${requiredChecks}) ? undefined : {
+${properties}
+      }`;
+}
+
+/**
+ * Builds a resolved (non-signal) params object literal without any idle-state
+ * guard. Used by signal mutation methods to forward unwrapped params to the
+ * Promise-based method, which always requires a concrete params object.
+ */
+function generateResolvedParamsObject(operation: OperationModel): string {
   const params = [...operation.pathParams, ...operation.queryParams, ...operation.headerParams];
 
   if (params.length === 0) {
@@ -445,13 +556,13 @@ ${properties}
           }`;
 }
 
-function toParameterModel(parameter: any): ParameterModel {
-  const style = parameter.style as QueryStyle | undefined;
-  const explode = parameter.explode as boolean | undefined;
+function toParameterModel(parameter: OpenApiParameter): ParameterModel {
+  const style = parameter.style;
+  const explode = parameter.explode;
 
   return {
     name: parameter.name,
-    location: parameter.in,
+    location: parameter.in as ParameterModel['location'],
     required: Boolean(parameter.required),
     type: schemaToTsType(parameter.schema),
     // Only emit style/explode for query params with non-default values.
@@ -460,7 +571,7 @@ function toParameterModel(parameter: any): ParameterModel {
   };
 }
 
-function extractResponseType(operation: any): {
+function extractResponseType(operation: OpenApiOperation): {
   responseType: string;
   responseParser?: 'json' | 'text' | 'blob' | 'arrayBuffer' | 'stream';
 } {
@@ -597,7 +708,7 @@ function isSuccessStatus(statusCode: string): boolean {
   return false;
 }
 
-function extractSchemaFromResponse(response: any): {
+function extractSchemaFromResponse(response: OpenApiResponse): {
   schema?: string;
   contentType?: string;
 } {
@@ -606,7 +717,7 @@ function extractSchemaFromResponse(response: any): {
   }
 
   // Prefer application/json, then any JSON-like content type, then */*.
-  const entries = Object.entries(response.content) as [string, any][];
+  const entries = Object.entries(response.content);
 
   const jsonEntry = entries.find(([type]) => type === 'application/json');
   const jsonLikeEntry = entries.find(
@@ -637,13 +748,13 @@ function extractSchemaFromResponse(response: any): {
  * Detects `multipart/form-data` and `application/x-www-form-urlencoded` and
  * captures part schemas for multipart bodies.
  */
-function extractRequestBody(operation: any): RequestBodyModel | undefined {
+function extractRequestBody(operation: OpenApiOperation): RequestBodyModel | undefined {
   const content = operation.requestBody?.content;
   if (!content) {
     return undefined;
   }
 
-  const entries = Object.entries(content) as [string, any][];
+  const entries = Object.entries(content);
   if (entries.length === 0) {
     return undefined;
   }
@@ -672,7 +783,7 @@ function extractRequestBody(operation: any): RequestBodyModel | undefined {
 
   if (isMultipart && schema.type === 'object' && schema.properties) {
     const required = new Set<string>(schema.required ?? []);
-    parts = Object.entries(schema.properties).map(([name, propSchema]: [string, any]) => ({
+    parts = Object.entries(schema.properties).map(([name, propSchema]) => ({
       name,
       type: schemaToTsType(propSchema),
       required: required.has(name),

@@ -7,6 +7,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Resource idle-state**: `getXResource(params)` allows `params()` to return `undefined`, preserving Angular `resource()` idle-state and preventing premature HTTP requests / 401s. `params()` returns `undefined` when any **required** param resolves to `undefined`; optional-only operations always resolve. Loader's inline `params` type excludes `undefined` (`Exclude<R, undefined>`), so `params.id` stays directly accessible.
+- **Class-based middleware with DI**: `NG_OPENAPI_SIGNALS_MIDDLEWARE` is now a multi-provider `InjectionToken` with factory fallback, enabling `{ provide, multi: true, useClass }` registration. Runtime emits `ApiMiddleware` interface (`handle(request, next)`) alongside `ApiMiddlewareFn`; `ApiMiddlewareEntry` is the union; `ApiFetchClient` dispatches via duck-typing. `provideNgOpenapiSignals({ middleware: [...] })` array syntax preserved as convenience wrapper.
+- **Fixture-based generator tests**: Central `tests/fixtures.test.ts` dynamically discovers all `tests/fixtures/*.yml` and validates the full generated file structure (core runtime files, `models/index.ts`, `resources/index.ts` re-exports, auto-generated header) for every fixture.
+- **Snapshot tests for generated output**: `tests/snapshot.test.ts` generates the example output and snapshots every file, catching codegen regressions early.
+- **Runtime tests for generated `ApiFetchClient`**: `tests/api-fetch-client.runtime.test.ts` imports the real generated `examples/generated/api-fetch-client.ts` and tests it via Angular DI (`createEnvironmentInjector` + `runInInjectionContext`), covering URL building, query styles, response parsing, headers, auth, middleware (function + class), error handling, hooks, FormData/binary, and date transformer integration.
+- **Release checks**: Added `publint`, `@arethetypeswrong/cli`, and `knip` as devDependencies with `check:publint`, `check:attw`, `check:knip`, and combined `check:release` npm scripts. Added `.attw.json` (ESM-only profile) and `knip.json`. CI workflow extended with a `release-checks` job.
+
+### Changed
+
+- **`package.json` exports**: `types` condition now precedes `import` in `exports["./config"]` (publint requirement).
+- **`tsconfig.json`**: Added `experimentalDecorators: true` and `examples/generated/**/*.ts` to `include` so vitest can transform the generated `@Service()` decorator.
+- **Removed unused `yaml` dependency**: `@apidevtools/swagger-parser` handles YAML parsing internally; the `yaml` package was not imported anywhere.
+
 ## [0.9.0] - 2026-07-16
 
 ### Fixed

@@ -54,9 +54,7 @@ export function defineConfig(config: PartialGeneratorConfig): PartialGeneratorCo
  *
  * Returns an empty object if no config file is found.
  */
-export async function loadConfig(
-  configPath?: string,
-): Promise<PartialGeneratorConfig> {
+export async function loadConfig(configPath?: string): Promise<PartialGeneratorConfig> {
   const filePath = resolve(configPath ?? DEFAULT_CONFIG_FILE);
 
   if (!existsSync(filePath)) {
@@ -83,11 +81,7 @@ export function resolveConfig(
     output: cliOptions.output ?? fileConfig.output ?? DEFAULT_CONFIG.output,
     clean: cliOptions.clean ?? fileConfig.clean ?? DEFAULT_CONFIG.clean,
     groupBy: cliOptions.groupBy ?? fileConfig.groupBy ?? DEFAULT_CONFIG.groupBy,
-    runtime: mergeRuntime(
-      DEFAULT_CONFIG.runtime,
-      fileConfig.runtime,
-      cliOptions.runtime,
-    ),
+    runtime: mergeRuntime(DEFAULT_CONFIG.runtime, fileConfig.runtime, cliOptions.runtime),
   };
 }
 
@@ -95,9 +89,7 @@ export function resolveConfig(
  * Deep-merges runtime config layers: defaults < file < cli.
  * Object values are merged key-by-key; scalars use `??`.
  */
-function mergeRuntime(
-  ...layers: (RuntimeConfig | undefined)[]
-): RuntimeConfig {
+function mergeRuntime(...layers: (RuntimeConfig | undefined)[]): RuntimeConfig {
   const result: RuntimeConfig = {
     transport: 'fetch',
     defaultHeaders: {},
@@ -197,13 +189,8 @@ export function validateConfig(config: GeneratorConfig): void {
     }
   }
 
-  if (
-    runtime?.responseTypeHints !== undefined &&
-    typeof runtime.responseTypeHints !== 'boolean'
-  ) {
-    throw new Error(
-      'Configuration error: runtime.responseTypeHints must be a boolean.',
-    );
+  if (runtime?.responseTypeHints !== undefined && typeof runtime.responseTypeHints !== 'boolean') {
+    throw new Error('Configuration error: runtime.responseTypeHints must be a boolean.');
   }
 
   if (
@@ -216,10 +203,7 @@ export function validateConfig(config: GeneratorConfig): void {
     );
   }
 
-  if (
-    runtime?.defaultQueryStyle !== undefined &&
-    !isQueryStyle(runtime.defaultQueryStyle)
-  ) {
+  if (runtime?.defaultQueryStyle !== undefined && !isQueryStyle(runtime.defaultQueryStyle)) {
     throw new Error(
       `Configuration error: invalid runtime.defaultQueryStyle '${runtime.defaultQueryStyle}'. Must be 'form', 'spaceDelimited', 'pipeDelimited', or 'deepObject'.`,
     );
@@ -229,36 +213,19 @@ export function validateConfig(config: GeneratorConfig): void {
     runtime?.defaultQueryExplode !== undefined &&
     typeof runtime.defaultQueryExplode !== 'boolean'
   ) {
-    throw new Error(
-      'Configuration error: runtime.defaultQueryExplode must be a boolean.',
-    );
+    throw new Error('Configuration error: runtime.defaultQueryExplode must be a boolean.');
   }
 
-  if (
-    runtime?.preferContentType !== undefined &&
-    typeof runtime.preferContentType !== 'string'
-  ) {
-    throw new Error(
-      'Configuration error: runtime.preferContentType must be a string.',
-    );
+  if (runtime?.preferContentType !== undefined && typeof runtime.preferContentType !== 'string') {
+    throw new Error('Configuration error: runtime.preferContentType must be a string.');
   }
 
-  if (
-    runtime?.signalMutations !== undefined &&
-    typeof runtime.signalMutations !== 'boolean'
-  ) {
-    throw new Error(
-      'Configuration error: runtime.signalMutations must be a boolean.',
-    );
+  if (runtime?.signalMutations !== undefined && typeof runtime.signalMutations !== 'boolean') {
+    throw new Error('Configuration error: runtime.signalMutations must be a boolean.');
   }
 
-  if (
-    runtime?.dateTransformer !== undefined &&
-    typeof runtime.dateTransformer !== 'boolean'
-  ) {
-    throw new Error(
-      'Configuration error: runtime.dateTransformer must be a boolean.',
-    );
+  if (runtime?.dateTransformer !== undefined && typeof runtime.dateTransformer !== 'boolean') {
+    throw new Error('Configuration error: runtime.dateTransformer must be a boolean.');
   }
 }
 
@@ -280,5 +247,10 @@ export function isTransport(value: unknown): value is HttpTransport {
  * Type guard for the `QueryStyle` union.
  */
 export function isQueryStyle(value: unknown): value is QueryStyle {
-  return value === 'form' || value === 'spaceDelimited' || value === 'pipeDelimited' || value === 'deepObject';
+  return (
+    value === 'form' ||
+    value === 'spaceDelimited' ||
+    value === 'pipeDelimited' ||
+    value === 'deepObject'
+  );
 }

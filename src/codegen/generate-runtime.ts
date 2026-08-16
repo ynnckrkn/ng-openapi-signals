@@ -12,12 +12,8 @@ export function generateRuntimeFiles(config: GeneratorConfig): Record<string, st
   const transport = config.runtime?.transport ?? 'fetch';
   const signalMutations = config.runtime?.signalMutations === true;
   const dateTransformer = config.runtime?.dateTransformer === true;
-  const mutationUtilsFile = signalMutations
-    ? {'mutation-utils.ts': generateMutationUtils()}
-    : {};
-  const dateUtilsFile = dateTransformer
-    ? {'date-utils.ts': generateDateUtils()}
-    : {};
+  const mutationUtilsFile = signalMutations ? {'mutation-utils.ts': generateMutationUtils()} : {};
+  const dateUtilsFile = dateTransformer ? {'date-utils.ts': generateDateUtils()} : {};
 
   if (transport === 'httpClient') {
     return {

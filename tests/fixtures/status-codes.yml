@@ -8,53 +8,53 @@ paths:
       operationId: getMulti
       tags: [Multi]
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Foo"
-        "201":
+                $ref: '#/components/schemas/Foo'
+        '201':
           description: created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Bar"
-        "404":
+                $ref: '#/components/schemas/Bar'
+        '404':
           description: not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: '#/components/schemas/Error'
   /only201:
     get:
       operationId: getOnly201
       tags: [Multi]
       responses:
-        "201":
+        '201':
           description: created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Bar"
+                $ref: '#/components/schemas/Bar'
   /nocontent:
     get:
       operationId: getNoContent
       tags: [Multi]
       responses:
-        "204":
+        '204':
           description: no content
   /range:
     get:
       operationId: getRange
       tags: [Multi]
       responses:
-        "2XX":
+        '2XX':
           description: range
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Foo"
+                $ref: '#/components/schemas/Foo'
   /default-only:
     get:
       operationId: getDefaultOnly
@@ -65,20 +65,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Foo"
+                $ref: '#/components/schemas/Foo'
   /default-and-204:
     get:
       operationId: getDefaultAnd204
       tags: [Multi]
       responses:
-        "204":
+        '204':
           description: no content
         default:
           description: default response with schema
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Bar"
+                $ref: '#/components/schemas/Bar'
   /default-no-content:
     get:
       operationId: getDefaultNoContent

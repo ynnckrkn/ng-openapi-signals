@@ -8,12 +8,12 @@ paths:
       operationId: getPairs
       tags: [Pairs]
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PairList"
+                $ref: '#/components/schemas/PairList'
 components:
   schemas:
     PairList:

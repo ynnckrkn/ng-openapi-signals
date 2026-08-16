@@ -8,14 +8,14 @@ paths:
       operationId: getPets
       tags: [Pets]
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Pet"
+                  $ref: '#/components/schemas/Pet'
 components:
   schemas:
     Named:
@@ -34,16 +34,16 @@ components:
           type: integer
     Pet:
       allOf:
-        - $ref: "#/components/schemas/Named"
-        - $ref: "#/components/schemas/Aged"
+        - $ref: '#/components/schemas/Named'
+        - $ref: '#/components/schemas/Aged'
     Animal:
       oneOf:
-        - $ref: "#/components/schemas/Pet"
+        - $ref: '#/components/schemas/Pet'
         - type: object
           properties:
             kind:
               type: string
     Mixed:
       anyOf:
-        - $ref: "#/components/schemas/Named"
-        - $ref: "#/components/schemas/Aged"
+        - $ref: '#/components/schemas/Named'
+        - $ref: '#/components/schemas/Aged'

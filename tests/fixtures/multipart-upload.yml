@@ -28,7 +28,7 @@ paths:
                 caption:
                   type: string
       responses:
-        "200":
+        '200':
           description: Avatar uploaded.
           content:
             application/json:
@@ -57,7 +57,7 @@ paths:
                 count:
                   type: integer
       responses:
-        "200":
+        '200':
           description: Bulk created.
           content:
             application/json:

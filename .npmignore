@@ -12,5 +12,5 @@ tests
 tsconfig.build.json
 tsconfig.json
 CHANGELOG.md
-RUNTIME.md
+docs
 swagger.yaml

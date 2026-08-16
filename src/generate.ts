@@ -36,9 +36,7 @@ function withRuntimeDefaults(config: GeneratorConfig): GeneratorConfig {
  * Performs no disk I/O and no Prettier formatting. This is the shared base
  * used by `generate()`, `--dry-run` and `--check`.
  */
-export async function generateFiles(
-  config: GeneratorConfig,
-): Promise<Record<string, string>> {
+export async function generateFiles(config: GeneratorConfig): Promise<Record<string, string>> {
   const normalizedConfig = withRuntimeDefaults(config);
   const api = await loadOpenApi(normalizedConfig.input);
 
@@ -60,9 +58,7 @@ export async function generateFiles(
  * Formats every generated file with Prettier and prepends the
  * auto-generated header. Pure function — no disk I/O.
  */
-export async function formatFiles(
-  files: Record<string, string>,
-): Promise<Record<string, string>> {
+export async function formatFiles(files: Record<string, string>): Promise<Record<string, string>> {
   const formatted: Record<string, string> = {};
 
   for (const [fileName, content] of Object.entries(files)) {
@@ -129,12 +125,8 @@ function generateIndexFile(config: GeneratorConfig): string {
     transport === 'httpClient'
       ? "export * from './api-http-client';"
       : "export * from './api-fetch-client';";
-  const mutationExport = signalMutations
-    ? "export * from './mutation-utils';\n"
-    : '';
-  const dateUtilsExport = dateTransformer
-    ? "export * from './date-utils';\n"
-    : '';
+  const mutationExport = signalMutations ? "export * from './mutation-utils';\n" : '';
+  const dateUtilsExport = dateTransformer ? "export * from './date-utils';\n" : '';
 
   return `export * from './providers';
 export * from './api-error';

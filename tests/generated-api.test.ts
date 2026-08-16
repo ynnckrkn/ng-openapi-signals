@@ -75,6 +75,41 @@ describe('generated API', () => {
     expect(content).toContain('readSignalOrValue');
     expect(content).toContain("from '../signal-utils'");
   });
+
+  it('params factory for required-param GET returns undefined when required param is undefined', async () => {
+    const content = await readApiFile();
+    // getUserById has a required `id` path param → params() must be able to
+    // return undefined to preserve Angular resource() idle state.
+    expect(content).toContain('| undefined =>');
+    expect(content).toMatch(/readSignalOrValue\(params\.id\) === undefined/);
+  });
+
+  it('params factory for optional-only GET always resolves (no undefined guard)', async () => {
+    const content = await readApiFile();
+    // searchUsers has only optional query params → no idle guard needed.
+    const searchIndex = content.indexOf('searchUsersResource');
+    const searchSection = content.slice(searchIndex);
+    const searchEnd = searchSection.indexOf('  }');
+    const searchBlock = searchSection.slice(0, searchEnd);
+    expect(searchBlock).not.toContain('=== undefined ? undefined');
+  });
+
+  it('loader params type excludes undefined for idle-capable resources', async () => {
+    const content = await readApiFile();
+    // The loader's inline `params` type must be the concrete (non-undefined)
+    // shape, since Angular only invokes the loader when params() is defined.
+    // Verify the loader block for getUserByIdResource does not declare
+    // `params` as `| undefined`.
+    const loaderIndex = content.indexOf('getUserByIdResource');
+    const loaderSection = content.slice(loaderIndex);
+    // Slice only from the `loader:` keyword onward to exclude the params
+    // factory (which legitimately contains `| undefined`).
+    const loaderStart = loaderSection.indexOf('loader:');
+    const loaderBlock = loaderSection.slice(loaderStart, loaderStart + 400);
+    // The loader's params type annotation should be the concrete object.
+    expect(loaderBlock).toMatch(/params:\s*\{/);
+    expect(loaderBlock).not.toContain('| undefined');
+  });
 });
 
 describe('generated API with httpClient transport', () => {
@@ -147,9 +182,7 @@ describe('generated API with signal mutations', () => {
   it('generates uploadUserAvatarMutation with unwrapped path params', async () => {
     const content = await readFile(join(MUT_OUTPUT_DIR, 'resources', 'users.api.ts'), 'utf8');
     expect(content).toContain('uploadUserAvatarMutation(params: {');
-    expect(content).toContain(
-      'Mutation<UploadUserAvatarRequest2, UploadUserAvatarResponse>',
-    );
+    expect(content).toContain('Mutation<UploadUserAvatarRequest2, UploadUserAvatarResponse>');
     expect(content).toContain('readSignalOrValue(params.id)');
   });
 
@@ -191,9 +224,7 @@ describe('generated API without signal mutations (default)', () => {
   });
 
   it('does not emit mutation-utils.ts by default', async () => {
-    await expect(
-      readFile(join(DEFAULT_OUTPUT_DIR, 'mutation-utils.ts'), 'utf8'),
-    ).rejects.toThrow();
+    await expect(readFile(join(DEFAULT_OUTPUT_DIR, 'mutation-utils.ts'), 'utf8')).rejects.toThrow();
   });
 
   it('does not export mutation-utils from index.ts by default', async () => {

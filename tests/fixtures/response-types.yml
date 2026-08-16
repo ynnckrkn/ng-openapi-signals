@@ -8,7 +8,7 @@ paths:
       operationId: getText
       tags: [Content]
       responses:
-        "200":
+        '200':
           description: A plain text document.
           content:
             text/plain:
@@ -19,7 +19,7 @@ paths:
       operationId: getAvatar
       tags: [Content]
       responses:
-        "200":
+        '200':
           description: A PNG image.
           content:
             image/png:
@@ -31,7 +31,7 @@ paths:
       operationId: getJson
       tags: [Content]
       responses:
-        "200":
+        '200':
           description: A JSON object.
           content:
             application/json:
@@ -45,5 +45,5 @@ paths:
       operationId: deleteNoContent
       tags: [Content]
       responses:
-        "204":
+        '204':
           description: No content.

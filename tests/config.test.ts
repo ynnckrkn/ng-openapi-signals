@@ -89,9 +89,12 @@ describe('config', () => {
     });
 
     it('file runtime.defaultHeaders overrides defaults', () => {
-      const config = resolveConfig({}, {
-        runtime: {defaultHeaders: {'X-Client': 'ng-openapi-signals'}},
-      });
+      const config = resolveConfig(
+        {},
+        {
+          runtime: {defaultHeaders: {'X-Client': 'ng-openapi-signals'}},
+        },
+      );
       expect(config.runtime!.defaultHeaders).toEqual({'X-Client': 'ng-openapi-signals'});
     });
 
@@ -113,9 +116,12 @@ describe('config', () => {
     });
 
     it('deep-merges runtime.defaultHeaders from file and defaults', () => {
-      const config = resolveConfig({}, {
-        runtime: {defaultHeaders: {'X-Custom': 'abc'}},
-      });
+      const config = resolveConfig(
+        {},
+        {
+          runtime: {defaultHeaders: {'X-Custom': 'abc'}},
+        },
+      );
       // default is {} so result equals file override
       expect(config.runtime!.defaultHeaders).toEqual({'X-Custom': 'abc'});
     });
@@ -283,7 +289,7 @@ describe('config', () => {
           output: './out',
           runtime: {defaultHeaders: {'X-Num': 123 as unknown as string}},
         }),
-      ).toThrow("must be a string, got number");
+      ).toThrow('must be a string, got number');
     });
 
     it('throws when runtime.responseTypeHints is not a boolean', () => {
@@ -402,7 +408,11 @@ describe('config', () => {
           ...DEFAULT_CONFIG,
           input: './openapi.json',
           output: './out',
-          runtime: {defaultQueryStyle: 'deepObject', defaultQueryExplode: false, preferContentType: 'multipart/form-data'},
+          runtime: {
+            defaultQueryStyle: 'deepObject',
+            defaultQueryExplode: false,
+            preferContentType: 'multipart/form-data',
+          },
         }),
       ).not.toThrow();
     });

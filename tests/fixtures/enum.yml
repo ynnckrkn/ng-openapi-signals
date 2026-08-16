@@ -8,12 +8,12 @@ paths:
       operationId: getStatus
       tags: [Status]
       responses:
-        "200":
+        '200':
           description: ok
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
+                $ref: '#/components/schemas/StatusResponse'
 components:
   schemas:
     UserStatus:
@@ -40,9 +40,9 @@ components:
         - tags
       properties:
         status:
-          $ref: "#/components/schemas/UserStatus"
+          $ref: '#/components/schemas/UserStatus'
         code:
-          $ref: "#/components/schemas/StatusCode"
+          $ref: '#/components/schemas/StatusCode'
         tags:
           type: array
           items:

@@ -80,22 +80,22 @@ This roadmap outlines the planned direction for `ng-openapi-signals`.
 - [x] Add signal based Mutation-Layer for POST/PUT/PATCH/DELETE (optional).
 - [x] Add built-in transformers for dates.
 
-## 0.10.x - Generated Resources & Services
+## 0.10.x - Testing, Quality and Dependency Injection for Middleware
 
-- Rename folder `resource` to `services`
-- Ensure that the generated function `getXResource(params)` allows `params()` to return `undefined` (preserve Angular `resource()` idle-state) to prevent immediate HTTP requests and 401s.
-
-## 0.11.x - Testing and Quality
-
-- Add fixture-based generator tests.
-- Add snapshot tests for generated output.
-- Add runtime tests for `ApiFetchClient`.
-- Add test coverage reporting.
-- Add linting.
-- Add release checks.
+- [x] Ensure that the generated function `getXResource(params)` allows `params()` to return `undefined` (preserve Angular `resource()` idle-state) to prevent immediate HTTP requests and 401s.
+- [x] Add fixture-based generator tests.
+- [x] Add snapshot tests for generated output.
+- [x] Add runtime tests for the generated `ApiFetchClient` (current tests mirror the logic inline instead of importing the generated output).
+- [x] Add linting.
+- [x] Add release checks:
+  - [x] Add `publint` to validate npm package structure, exports, and types before publish.
+  - [x] Add `@arethetypeswrong/cli` to validate published TypeScript types across module-resolution environments.
+  - [x] Add `knip` to detect unused dependencies, exports, files, and dead code.
+- [x] Add dependency injection for middleware: support a multi-provider `InjectionToken` (`NG_OPENAPI_SIGNALS_MIDDLEWARE`) so middleware can be registered via `{ provide, multi: true, useClass }` from any feature module, support class-based injectable middleware alongside the existing function-based middleware, allow middleware to inject Angular services via constructor DI, generate an `ApiMiddleware` interface in the runtime output, keep the existing `provideNgOpenapiSignals({ middleware: […] })` array syntax as a convenience wrapper, and add tests for class-based middleware, DI injection, and coexistence of both patterns.
 
 ## 1.0.0 - Stable Release
 
+- Rename folder `resource` to `services`
 - Stabilize generated API shape.
 - Stabilize configuration format.
 - Complete documentation.
