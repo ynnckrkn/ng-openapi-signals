@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-16
+
 ### Added
 
 - **Resource idle-state**: `getXResource(params)` allows `params()` to return `undefined`, preserving Angular `resource()` idle-state and preventing premature HTTP requests / 401s. `params()` returns `undefined` when any **required** param resolves to `undefined`; optional-only operations always resolve. Loader's inline `params` type excludes `undefined` (`Exclude<R, undefined>`), so `params.id` stays directly accessible.
