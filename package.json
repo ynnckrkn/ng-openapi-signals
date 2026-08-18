@@ -46,7 +46,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ynnckrkn/ng-openapi-signals.git"
+    "url": "git+https://github.com/realdeepnull/ng-openapi-signals.git"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
