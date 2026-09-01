@@ -49,7 +49,7 @@ export async function generateFiles(config: GeneratorConfig): Promise<Record<str
   hoistInlineSchemas(doc);
 
   const schemas = extractSchemas(doc);
-  const operations = extractOperations(doc);
+  const operations = extractOperations(doc, normalizedConfig);
 
   return {
     ...generateRuntimeFiles(normalizedConfig),
@@ -62,26 +62,31 @@ export async function generateFiles(config: GeneratorConfig): Promise<Record<str
 /**
  * Formats every generated file with Prettier and prepends the
  * auto-generated header. Pure function — no disk I/O.
+ *
+ * Files are formatted in parallel; Prettier formatting is pure per file, so
+ * parallel execution produces identical output to sequential formatting.
  */
 export async function formatFiles(files: Record<string, string>): Promise<Record<string, string>> {
-  const formatted: Record<string, string> = {};
+  const entries = await Promise.all(
+    Object.entries(files).map(async ([fileName, content]) => {
+      const formatted = await format(withHeader(content), {
+        parser: 'typescript',
+        singleQuote: true,
+        trailingComma: 'none',
+      });
+      return [fileName, formatted] as const;
+    }),
+  );
 
-  for (const [fileName, content] of Object.entries(files)) {
-    formatted[fileName] = await format(withHeader(content), {
-      parser: 'typescript',
-      singleQuote: true,
-      trailingComma: 'none',
-    });
-  }
-
-  return formatted;
+  return Object.fromEntries(entries);
 }
 
 /**
  * Writes the given (formatted) file map to the output directory.
  *
  * When `clean` is `true`, the output directory is removed first. Creates
- * parent directories as needed.
+ * parent directories as needed. Files are written in parallel — each file
+ * has a unique path, so there are no write conflicts.
  */
 export async function writeFiles(
   output: string,
@@ -99,15 +104,17 @@ export async function writeFiles(
     recursive: true,
   });
 
-  for (const [fileName, content] of Object.entries(files)) {
-    const outputPath = join(output, fileName);
+  await Promise.all(
+    Object.entries(files).map(async ([fileName, content]) => {
+      const outputPath = join(output, fileName);
 
-    await mkdir(dirname(outputPath), {
-      recursive: true,
-    });
+      await mkdir(dirname(outputPath), {
+        recursive: true,
+      });
 
-    await writeFile(outputPath, content, 'utf8');
-  }
+      await writeFile(outputPath, content, 'utf8');
+    }),
+  );
 }
 
 /**

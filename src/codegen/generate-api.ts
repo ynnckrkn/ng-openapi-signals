@@ -67,7 +67,15 @@ const DEFAULT_QUERY_STYLE: QueryStyle = 'form';
 /** Default explode per OpenAPI spec: `true` for `form` style query params. */
 const DEFAULT_QUERY_EXPLODE = true;
 
-export function extractOperations(api: OpenApiDocument): OperationModel[] {
+export function extractOperations(
+  api: OpenApiDocument,
+  config?: Pick<GeneratorConfig, 'runtime'>,
+): OperationModel[] {
+  // Effective query serialization defaults: config override or OpenAPI defaults.
+  const runtime = config?.runtime;
+  const defaultQueryStyle: QueryStyle = runtime?.defaultQueryStyle ?? DEFAULT_QUERY_STYLE;
+  const defaultQueryExplode: boolean = runtime?.defaultQueryExplode ?? DEFAULT_QUERY_EXPLODE;
+
   const operations: OperationModel[] = [];
 
   for (const [path, pathItem] of Object.entries(api.paths ?? {})) {
@@ -82,17 +90,17 @@ export function extractOperations(api: OpenApiDocument): OperationModel[] {
 
       const pathParams = parameters
         .filter((parameter) => parameter.in === 'path')
-        .map(toParameterModel);
+        .map((parameter) => toParameterModel(parameter, defaultQueryStyle, defaultQueryExplode));
 
       const queryParams = parameters
         .filter((parameter) => parameter.in === 'query')
-        .map(toParameterModel);
+        .map((parameter) => toParameterModel(parameter, defaultQueryStyle, defaultQueryExplode));
 
       const headerParams = parameters
         .filter((parameter) => parameter.in === 'header')
-        .map(toParameterModel);
+        .map((parameter) => toParameterModel(parameter, defaultQueryStyle, defaultQueryExplode));
 
-      const requestBody = extractRequestBody(operation);
+      const requestBody = extractRequestBody(operation, runtime?.preferContentType);
       const {responseType, responseParser} = extractResponseType(operation);
 
       operations.push({
@@ -503,10 +511,11 @@ function formatParamAccess(param: ParameterModel): string {
 /**
  * Generates the query expression for the runtime client.
  *
- * For parameters with non-default style/explode, wraps the value with metadata:
+ * Params whose resolved serialization deviates from the OpenAPI spec default
+ * (`form` + `explode: true`) are wrapped with metadata:
  * `{ value: params.tags, style: 'spaceDelimited', explode: false }`.
- * For default style (form + explode:true), passes the plain value for
- * backward compatibility.
+ * Params using the spec default are passed as plain values (the runtime
+ * treats them as form+explode:true).
  */
 function generateQueryExpression(operation: OperationModel): string {
   if (operation.queryParams.length === 0) {
@@ -515,11 +524,10 @@ function generateQueryExpression(operation: OperationModel): string {
 
   const properties = operation.queryParams
     .map((param) => {
-      const isDefaultStyle =
-        (!param.style || param.style === DEFAULT_QUERY_STYLE) &&
-        (param.explode === undefined || param.explode === DEFAULT_QUERY_EXPLODE);
+      // The runtime's implicit default (no metadata) is form + explode:true.
+      const isRuntimeDefault = !param.style && param.explode === undefined;
 
-      if (isDefaultStyle) {
+      if (isRuntimeDefault) {
         return `            ${param.name}: ${formatParamAccess(param)}`;
       }
 
@@ -556,18 +564,29 @@ ${properties}
           }`;
 }
 
-function toParameterModel(parameter: OpenApiParameter): ParameterModel {
-  const style = parameter.style;
-  const explode = parameter.explode;
+function toParameterModel(
+  parameter: OpenApiParameter,
+  defaultQueryStyle: QueryStyle = DEFAULT_QUERY_STYLE,
+  defaultQueryExplode: boolean = DEFAULT_QUERY_EXPLODE,
+): ParameterModel {
+  // Resolve the effective style/explode for query params: explicit spec
+  // values win, otherwise the effective defaults (config override or
+  // OpenAPI spec defaults) apply. The resolved values are captured in the
+  // model so downstream generation sees the full effective serialization.
+  const style: QueryStyle = parameter.style ?? defaultQueryStyle;
+  const explode: boolean = parameter.explode ?? defaultQueryExplode;
+  // Only query params are serialized via style/explode metadata.
+  const isQuery = parameter.in === 'query';
 
   return {
     name: parameter.name,
     location: parameter.in as ParameterModel['location'],
     required: Boolean(parameter.required),
     type: schemaToTsType(parameter.schema),
-    // Only emit style/explode for query params with non-default values.
-    ...(style && style !== DEFAULT_QUERY_STYLE ? {style} : {}),
-    ...(explode !== undefined && explode !== DEFAULT_QUERY_EXPLODE ? {explode} : {}),
+    ...(isQuery && style !== DEFAULT_QUERY_STYLE
+      ? {style}
+      : {}),
+    ...(isQuery && explode !== DEFAULT_QUERY_EXPLODE ? {explode} : {}),
   };
 }
 
@@ -744,11 +763,18 @@ function extractSchemaFromResponse(response: OpenApiResponse): {
 /**
  * Extracts the request body model from an OpenAPI operation.
  *
- * Selects the primary content type with preference for `application/json`.
+ * Selects the primary content type in this order:
+ * 1. `runtime.preferContentType` (when set and offered by the spec)
+ * 2. `application/json`
+ * 3. First entry with a schema
+ *
  * Detects `multipart/form-data` and `application/x-www-form-urlencoded` and
  * captures part schemas for multipart bodies.
  */
-function extractRequestBody(operation: OpenApiOperation): RequestBodyModel | undefined {
+function extractRequestBody(
+  operation: OpenApiOperation,
+  preferContentType?: string,
+): RequestBodyModel | undefined {
   const content = operation.requestBody?.content;
   if (!content) {
     return undefined;
@@ -759,11 +785,15 @@ function extractRequestBody(operation: OpenApiOperation): RequestBodyModel | und
     return undefined;
   }
 
-  // Select the primary content type: prefer application/json, then the
-  // first entry with a schema.
+  // Select the primary content type: prefer the configured content type,
+  // then application/json, then the first entry with a schema.
+  const preferredEntry =
+    preferContentType !== undefined
+      ? entries.find(([type]) => type === preferContentType)
+      : undefined;
   const jsonEntry = entries.find(([type]) => type === 'application/json');
   const firstWithSchema = entries.find(([, c]) => c?.schema);
-  const chosen = jsonEntry ?? firstWithSchema;
+  const chosen = preferredEntry ?? jsonEntry ?? firstWithSchema;
 
   if (!chosen) {
     return undefined;

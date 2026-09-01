@@ -7,6 +7,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **Combined runtime CLI flags**: Runtime flags (`--transport`, `--default-query-style`, `--signal-mutations`, …) were spread as separate `{runtime: …}` fragments and silently overwrote each other — only the last flag survived. `buildCliConfig()` (`src/cli-options.ts`) now collects them into a single `runtime` object before merging over the file config.
+- **Double generation in `generate`**: The CLI ran `generateFiles()`/`formatFiles()` twice — once directly and again inside `generate()`. It now calls `writeFiles()` directly, making generation ~25–30 % faster.
+- **`runtime.defaultQueryStyle` / `runtime.defaultQueryExplode`**: Declared, validated and documented, but never read by the codegen. Query params without an explicit spec `style`/`explode` now honor the configured defaults; spec-explicit values always win.
+- **`runtime.preferContentType`**: Also never consumed. `extractRequestBody()` now picks the content type in this order: configured preference (when offered by the spec) → `application/json` → first entry with a schema.
+
+### Changed
+
+- **Parallel formatting and writing**: `formatFiles()` (Prettier) and `writeFiles()` (disk I/O) now process files via `Promise.all`. Output is byte-identical (verified via `--check`); example spec: writing ~28→10 ms, test suite ~10.3 s → ~5.4 s.
+
+### Added
+
+- **Tests**: `tests/cli-options.test.ts` (flag merging, override precedence), `tests/query-defaults.test.ts` (query-style/explode/content-type defaults), and `tests/fixtures/multi-content-type.yml` (JSON + multipart request body).
+
 ## [0.10.0] - 2026-08-16
 
 ### Added

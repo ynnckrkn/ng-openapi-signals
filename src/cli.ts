@@ -1,8 +1,8 @@
 import {Command} from 'commander';
-import {generate, generateFiles, formatFiles} from './generate';
+import {generateFiles, formatFiles, writeFiles} from './generate';
 import {checkFiles, checkPassed} from './check';
 import {loadConfig, resolveConfig, validateConfig} from './config';
-import {isGroupBy, isQueryStyle, isTransport} from './config';
+import {buildCliConfig} from './cli-options';
 import {logger} from './logger';
 
 const program = new Command();
@@ -47,31 +47,7 @@ program
       logger.setVerbose(options.verbose === true);
 
       const fileConfig = await loadConfig(options.config);
-
-      const cliConfig = {
-        ...(options.input ? {input: options.input} : {}),
-        ...(options.output ? {output: options.output} : {}),
-        ...(options.clean !== undefined ? {clean: options.clean} : {}),
-        ...(options.groupBy !== undefined && isGroupBy(options.groupBy)
-          ? {groupBy: options.groupBy}
-          : {}),
-        ...(options.transport !== undefined && isTransport(options.transport)
-          ? {runtime: {transport: options.transport}}
-          : {}),
-        ...(options.defaultQueryStyle !== undefined && isQueryStyle(options.defaultQueryStyle)
-          ? {runtime: {defaultQueryStyle: options.defaultQueryStyle}}
-          : {}),
-        ...(options.defaultQueryExplode !== undefined
-          ? {runtime: {defaultQueryExplode: options.defaultQueryExplode === 'true'}}
-          : {}),
-        ...(options.preferContentType !== undefined
-          ? {runtime: {preferContentType: options.preferContentType}}
-          : {}),
-        ...(options.signalMutations === true ? {runtime: {signalMutations: true}} : {}),
-        ...(options.dateTransformer === true ? {runtime: {dateTransformer: true}} : {}),
-      };
-
-      const config = resolveConfig(cliConfig, fileConfig);
+      const config = resolveConfig(buildCliConfig(options), fileConfig);
 
       validateConfig(config);
 
@@ -136,12 +112,12 @@ program
         return;
       }
 
-      // Normal generation.
+      // Normal generation: generate → format → write once (no double work).
       const files = await generateFiles(config);
       const formatted = await formatFiles(files);
-      const fileCount = Object.keys(formatted).length;
+      await writeFiles(config.output, formatted, config.clean);
 
-      await generate(config);
+      const fileCount = Object.keys(formatted).length;
 
       logger.success(`Generated ${fileCount} file(s) in ${config.output}.`);
 

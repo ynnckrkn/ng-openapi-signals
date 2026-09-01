@@ -29,7 +29,8 @@
     "check:publint": "publint",
     "check:attw": "attw --pack",
     "check:knip": "knip",
-    "check:release": "npm run check:publint && npm run check:attw && npm run check:knip"
+    "check:release": "npm run check:publint && npm run check:attw && npm run check:knip",
+    "gene": "npm run build && node dist/cli.mjs generate --config ../openapi-signals/test-angular-22/ng-openapi-signals.config.ts"
   },
   "keywords": [
     "angular",

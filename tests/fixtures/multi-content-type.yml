@@ -1,0 +1,45 @@
+openapi: 3.0.3
+info:
+  title: Multi Content Type Fixture
+  version: 1.0.0
+paths:
+  /users/{id}/avatar:
+    post:
+      operationId: uploadAvatar
+      tags: [Upload]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                caption:
+                  type: string
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                caption:
+                  type: string
+      responses:
+        '200':
+          description: Avatar uploaded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
