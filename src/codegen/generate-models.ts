@@ -51,16 +51,39 @@ function extractSchemaModel(name: string, schema: OpenAPISchema): SchemaModel {
     };
   }
 
-  // Object schema with only `additionalProperties` (no `properties`) → type alias
+  // Object schema with only `additionalProperties` (no properties) → type alias
   // `Record<string, T>`. Without this the generator would emit an empty interface
   // (e.g. `export interface RecordResponse {}`), silently dropping the value
   // type and, for a schema named `Object`, shadowing the global `Object` type.
-  if (schema.type === 'object' && !schema.properties && schema.additionalProperties !== undefined) {
+  // `properties: {}` (empty, truthy) counts as "no properties" — NestJS specs
+  // frequently declare `{type: object, properties: {}}`.
+  if (
+    schema.type === 'object' &&
+    Object.keys(schema.properties ?? {}).length === 0 &&
+    schema.additionalProperties !== undefined
+  ) {
     return {
       name,
       kind: 'alias',
       properties: [],
       aliasType: schemaToTsType(schema),
+    };
+  }
+
+  // Bare `type: object` (no/empty `properties`, no `additionalProperties`) → type
+  // alias `Record<string, unknown>`. Consistent with `objectToTsType()` (inline
+  // path) and avoids empty interfaces like `export interface Object {}` that
+  // shadow the global `Object` type when the schema is literally named `Object`.
+  if (
+    schema.type === 'object' &&
+    Object.keys(schema.properties ?? {}).length === 0 &&
+    schema.additionalProperties === undefined
+  ) {
+    return {
+      name,
+      kind: 'alias',
+      properties: [],
+      aliasType: 'Record<string, unknown>',
     };
   }
 

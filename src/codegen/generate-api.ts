@@ -669,8 +669,11 @@ function extractResponseType(operation: OpenApiOperation): {
   // Stream responses (e.g. text/event-stream) return a ReadableStream at
   // runtime, regardless of the declared schema type. Override the schema-
   // derived type so the generated client reflects the actual runtime value.
+  // `response.body` is `ReadableStream<Uint8Array> | null` per DOM types —
+  // it is null for responses that cannot have a body (204, 304, redirects),
+  // so the generated type includes `| null` to stay honest.
   if (responseParser === 'stream') {
-    responseType = 'ReadableStream';
+    responseType = 'ReadableStream<Uint8Array> | null';
   }
 
   return {
@@ -934,14 +937,25 @@ function collectType(type: string, output: Set<string>): void {
     'unknown',
     'null',
     'Record<string, unknown>',
+    'Uint8Array',
     // Browser built-in types — never imported from generated models.
     'Blob',
     'ArrayBuffer',
     'File',
     'FormData',
     'ReadableStream',
+    'ReadableStream<Uint8Array>',
+    'ReadableStream<Uint8Array> | null',
     'URLSearchParams',
   ]);
+
+  // Generic built-ins (e.g. `ReadableStream<Uint8Array>`) — strip the type
+  // arguments so the union-split branch doesn't mistake the wrapper for a
+  // model import.
+  const genericBuiltin = /^([A-Za-z_$][\w$]*)<.*>$/.exec(type);
+  if (genericBuiltin && primitives.has(genericBuiltin[1]!)) {
+    return;
+  }
 
   if (primitives.has(type)) {
     return;

@@ -368,6 +368,10 @@ export class ApiFetchClient {
         case 'arrayBuffer':
           return response.arrayBuffer();
         case 'stream':
+          // \`response.body\` is typed \`ReadableStream | null\` per DOM types — it is
+          // null for responses that cannot have a body (204, 304, redirects,
+          // empty SSE responses). The generated \`request<ReadableStream<Uint8Array> | null>\`
+          // type reflects this honestly, so the raw value is passed through.
           return response.body;
       }
     }
@@ -376,6 +380,13 @@ export class ApiFetchClient {
 
     if (contentType.includes('application/json')) {
       return this.parseJson(response);
+    }
+
+    if (contentType === 'text/event-stream') {
+      // Spec-declared or content-type-detected SSE stream. \`response.body\` is
+      // typed \`ReadableStream | null\` — passed through as-is for the same
+      // reason as the \`case 'stream'\` branch above.
+      return response.body;
     }
 
     if (contentType.startsWith('text/')) {
@@ -722,15 +733,30 @@ export function createMutation<TBody, TResult>(
   const status = signal<MutationStatus>('idle');
   const isLoading = computed(() => status() === 'loading');
 
+  // Monotonic sequence of the latest mutate() call. In-flight guards: only
+  // the most recent call may write result/error/status — a stale call that
+  // resolves after a newer one was started is ignored, so parallel calls
+  // can no longer overlap each other's state.
+  let latestCall = 0;
+
   async function mutate(body: TBody, signal?: AbortSignal): Promise<TResult> {
+    const call = ++latestCall;
     status.set('loading');
     error.set(undefined);
     try {
       const res = await fn(body, signal);
+      if (call !== latestCall) {
+        // A newer call superseded this one — do not touch state.
+        return res;
+      }
       result.set(res);
       status.set('success');
       return res;
     } catch (e) {
+      if (call !== latestCall) {
+        // A newer call superseded this one — do not touch state.
+        throw e;
+      }
       error.set(e);
       status.set('error');
       throw e;
@@ -738,6 +764,9 @@ export function createMutation<TBody, TResult>(
   }
 
   function reset(): void {
+    // Invalidate any in-flight call so a late resolution cannot repopulate
+    // result/error/status after the reset.
+    latestCall++;
     result.set(undefined);
     error.set(undefined);
     status.set('idle');
@@ -1177,7 +1206,7 @@ export class UsersApi {
   getUserEventsResource() {
     return resource({
       loader: ({ abortSignal }: { abortSignal: AbortSignal }) =>
-        this.client.request<ReadableStream>({
+        this.client.request<ReadableStream<Uint8Array> | null>({
           method: 'GET',
           path: '/users/events',
           responseType: 'stream',

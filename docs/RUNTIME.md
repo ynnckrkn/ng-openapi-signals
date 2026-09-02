@@ -267,7 +267,7 @@ Generated methods emit a `responseType` hint derived from the OpenAPI response
 | -------------------------------------------------------------- | -------------- | ------------------------------------------------------ |
 | `application/json` (and `*+json`)                              | `'json'`       | inferred from schema                                   |
 | `text/*`                                                       | `'text'`       | `string`                                               |
-| `text/event-stream`                                            | `'stream'`     | `string` (fetch: `ReadableStream`, httpClient: `Blob`) |
+| `text/event-stream`                                            | `'stream'`     | fetch: `ReadableStream<Uint8Array> | null`, httpClient: `Blob` |
 | `image/*`, `audio/*`, `video/*`, `octet-stream`, `multipart/*` | `'blob'`       | `Blob`                                                 |
 
 For responses without a known content type the runtime falls back to

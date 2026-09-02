@@ -217,6 +217,10 @@ export class ApiFetchClient {
         case 'arrayBuffer':
           return response.arrayBuffer();
         case 'stream':
+          // \`response.body\` is typed \`ReadableStream | null\` per DOM types — it is
+          // null for responses that cannot have a body (204, 304, redirects,
+          // empty SSE responses). The generated \`request<ReadableStream<Uint8Array> | null>\`
+          // type reflects this honestly, so the raw value is passed through.
           return response.body;
       }
     }
@@ -225,6 +229,13 @@ export class ApiFetchClient {
 
     if (contentType.includes('application/json')) {
       return this.parseJson(response);
+    }
+
+    if (contentType === 'text/event-stream') {
+      // Spec-declared or content-type-detected SSE stream. \`response.body\` is
+      // typed \`ReadableStream | null\` — passed through as-is for the same
+      // reason as the \`case 'stream'\` branch above.
+      return response.body;
     }
 
     if (contentType.startsWith('text/')) {

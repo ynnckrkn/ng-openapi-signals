@@ -1,0 +1,40 @@
+openapi: 3.0.3
+info:
+  title: Empty Object Fixture
+  version: 1.0.0
+paths:
+  /ping:
+    get:
+      operationId: ping
+      tags: [Ping]
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Object'
+  /config:
+    get:
+      operationId: getConfig
+      tags: [Ping]
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          style: deepObject
+          explode: true
+          schema:
+            $ref: '#/components/schemas/Object'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Object'
+components:
+  schemas:
+    Object:
+      type: object
+      properties: {}

@@ -312,6 +312,24 @@ describe('generated ApiFetchClient (runtime via DI)', () => {
       expect(result).toBe(response.body);
     });
 
+    it('returns null when response.body is null (204-like body)', async () => {
+      // A Response with a null body cannot have a content-type, so we
+      // simulate the null-body edge case directly: a stream request whose
+      // response has no body yields null — matching the honest generated
+      // type `request<ReadableStream<Uint8Array> | null>`.
+      const response = new Response(null, {status: 200});
+      vi.stubGlobal('fetch', mockFetch(response));
+      const client = createClient();
+
+      const result = await client.request<ReadableStream | null>({
+        method: 'GET',
+        path: '/events',
+        responseType: 'stream',
+      });
+
+      expect(result).toBeNull();
+    });
+
     it('falls back to content-type sniffing for text/* without responseType', async () => {
       const response = new Response('plain', {
         status: 200,

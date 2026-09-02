@@ -9,18 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
-- **Combined runtime CLI flags**: Runtime flags (`--transport`, `--default-query-style`, `--signal-mutations`, …) were spread as separate `{runtime: …}` fragments and silently overwrote each other — only the last flag survived. `buildCliConfig()` (`src/cli-options.ts`) now collects them into a single `runtime` object before merging over the file config.
-- **Double generation in `generate`**: The CLI ran `generateFiles()`/`formatFiles()` twice — once directly and again inside `generate()`. It now calls `writeFiles()` directly, making generation ~25–30 % faster.
-- **`runtime.defaultQueryStyle` / `runtime.defaultQueryExplode`**: Declared, validated and documented, but never read by the codegen. Query params without an explicit spec `style`/`explode` now honor the configured defaults; spec-explicit values always win.
-- **`runtime.preferContentType`**: Also never consumed. `extractRequestBody()` now picks the content type in this order: configured preference (when offered by the spec) → `application/json` → first entry with a schema.
+- **Bare `type: object` schemas** (including `properties: {}`, as emitted by NestJS) now emit `Record<string, unknown>` instead of an empty interface — a schema named `Object` no longer shadows the global type.
+- **`createMutation()` in-flight guards**: parallel `mutate()` calls no longer overwrite each other's state; only the latest call writes `result`/`error`/`status`. `reset()` invalidates in-flight calls.
+- **Stream responses with null body**: `response.body` is `ReadableStream<Uint8Array> | null` per DOM types (null for 204/304/redirects) — the generated type and the runtime return value now reflect this honestly (`request<ReadableStream<Uint8Array> | null>`).
+- **Runtime CLI flags** (`--transport`, `--default-query-style`, …) are collected into a single `runtime` object — previously they overwrote each other; only the last flag survived.
+- **Double generation in `generate`** removed — ~25–30 % faster.
+- **`runtime.defaultQueryStyle` / `defaultQueryExplode` / `preferContentType`** were never read by the codegen; spec-explicit values still win, configured defaults now apply otherwise.
 
 ### Changed
 
-- **Parallel formatting and writing**: `formatFiles()` (Prettier) and `writeFiles()` (disk I/O) now process files via `Promise.all`. Output is byte-identical (verified via `--check`); example spec: writing ~28→10 ms, test suite ~10.3 s → ~5.4 s.
+- **Parallel formatting and writing** via `Promise.all` — byte-identical output, test suite ~10.3 s → ~5.4 s.
 
 ### Added
 
-- **Tests**: `tests/cli-options.test.ts` (flag merging, override precedence), `tests/query-defaults.test.ts` (query-style/explode/content-type defaults), and `tests/fixtures/multi-content-type.yml` (JSON + multipart request body).
+- **Tests**: cli-options, query-defaults, mutation in-flight guards, bare `type: object` schemas (+ fixtures `multi-content-type.yml`, `empty-object.yml`).
 
 ## [0.10.0] - 2026-08-16
 

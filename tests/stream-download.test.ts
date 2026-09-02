@@ -37,7 +37,7 @@ describe('stream download response type', () => {
 
   it('uses ReadableStream return type for event-stream', async () => {
     const content = await readApiFile();
-    expect(content).toContain('request<ReadableStream>');
+    expect(content).toContain('request<ReadableStream<Uint8Array> | null>');
   });
 
   it('uses Blob return type for octet-stream binary', async () => {
