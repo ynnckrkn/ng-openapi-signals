@@ -4,7 +4,7 @@
   "description": "Signal-first OpenAPI client generator for Angular using resource() and fetch().",
   "type": "module",
   "bin": {
-    "ng-openapi-signals": "./dist/cli.mjs"
+    "ng-openapi-signals": "dist/cli.mjs"
   },
   "exports": {
     "./config": {
