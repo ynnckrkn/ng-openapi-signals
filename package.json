@@ -1,6 +1,6 @@
 {
   "name": "ng-openapi-signals",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Signal-first OpenAPI client generator for Angular using resource() and fetch().",
   "type": "module",
   "bin": {
@@ -29,8 +29,7 @@
     "check:publint": "publint",
     "check:attw": "attw --pack",
     "check:knip": "knip",
-    "check:release": "npm run check:publint && npm run check:attw && npm run check:knip",
-    "gene": "npm run build && node dist/cli.mjs generate --config ../openapi-signals/test-angular-22/ng-openapi-signals.config.ts"
+    "check:release": "npm run check:publint && npm run check:attw && npm run check:knip"
   },
   "keywords": [
     "angular",
